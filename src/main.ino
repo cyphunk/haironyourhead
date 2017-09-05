@@ -1,5 +1,5 @@
 //******************************************************************************
-#define FIRMWARE_VERSION 1.1  //MAJOR.MINOR more info on: http://semver.org
+#define FIRMWARE_VERSION 1.3  //MAJOR.MINOR more info on: http://semver.org
 #define PROJECT "health_monitor"
 #define SERIAL_SPEED 9600       // 9600 for BLE friend
 #define HOSTNAME "monitor"
@@ -24,6 +24,24 @@ extern "C"{
 //   ^              ^       ^               ^     ^
 //   Sketch    OTA update   File system   EEPROM  WiFi config (SDK)
 
+// -------------------- OSC libraries ------------------------------------------
+#include <OSCMessage.h>       // https://github.com/CNMAT/OSC.git
+#include <OSCBundle.h>
+#include <OSCData.h>
+
+WiFiUDP Udp;
+OSCErrorCode error;
+const IPAddress remoteIP(192,168,188,255);        // remote IP of your computer, 255 to multicast
+const unsigned int destPort = 9999;          // remote port to receive OSC
+const unsigned int localPort = 8888;        // local port to listen for OSC packets
+
+#define REPORT_INTERVAL 1000 * 3      //OSC report inerval 3 secs
+unsigned long previousMillis = 0;
+unsigned long currentMillis, runningTime;
+
+char header[16];    //OSC message header updated with unit ID
+char volt_ch[8];
+
 void setup()
 {
 #ifndef PRODUCTION
@@ -47,6 +65,8 @@ void setup()
   Serial.print( F("Vcc: ") ); Serial.println(ESP.getVcc());
   Serial.println();
 #endif
+
+sprintf(header, "/%i/", UNIT_ID);
 
 //---------------------------- WiFi --------------------------------------------
 WiFi.mode(WIFI_STA);  // https://www.arduino.cc/en/Reference/WiFiConfig
@@ -115,4 +135,98 @@ ArduinoOTA.begin();
 
 void loop() {
   ArduinoOTA.handle();
+
+  volt_ch[0] = {0}; //reset buffor
+  strcat(volt_ch, header);
+  strcat(volt_ch, "voltage"); //build OSC message with unit ID
+  OSCMessage voltage(volt_ch);
+  voltage.add(analogRead(A0));
+  Udp.beginPacket(remoteIP, destPort);
+  voltage.send(Udp);
+  Udp.endPacket();
+  voltage.empty();
+  delay(50);
+
+  currentMillis = millis();
+  if (currentMillis - previousMillis >= (REPORT_INTERVAL)) {
+    previousMillis = currentMillis;
+    sendReport();
+  }
+}
+
+void sendReport(){
+  #ifndef PRODUCTION
+    Serial.println("\n\r--- Sending OSC status ---");
+  #endif
+
+    //rssi
+    char rssi_ch[32];
+    rssi_ch[0] = {0};
+    int32_t RSSI = WiFi.RSSI(); //check if rssi is for current network
+    strcat(rssi_ch, header);
+    strcat(rssi_ch, "rssi");
+    OSCMessage rssi(rssi_ch);
+    rssi.add(RSSI);
+    #ifndef PRODUCTION
+    Serial.print(rssi_ch); Serial.print(" "); Serial.println(RSSI);
+    #endif
+
+    //time
+    char time_ch[32];
+    time_ch[0] = {0};
+    unsigned int runningTime = millis()/1000;
+    strcat(time_ch, header);
+    strcat(time_ch, "time");
+    OSCMessage rtime(time_ch);
+    rtime.add(runningTime);
+    #ifndef PRODUCTION
+      Serial.print(time_ch); Serial.print(" "); Serial.println(runningTime);
+    #endif
+
+    //version
+    char ver_ch[16];
+    ver_ch[0] = {0};
+    strcat(ver_ch, header);
+    strcat(ver_ch, "ver");
+    OSCMessage ver(ver_ch);
+    float Ver = FIRMWARE_VERSION; //silly conversion, Max MSP not happy with direct FIRMWARE_VERSION send
+    ver.add(Ver);
+    #ifndef PRODUCTION
+      Serial.print(ver_ch); Serial.print(" "); Serial.println(Ver);
+    #endif
+
+    //channel
+    char ch_ch[16];
+    ch_ch[0] = {0};
+    strcat(ch_ch, header);
+    strcat(ch_ch, "channel");
+    OSCMessage channel(ch_ch);
+    channel.add(WiFi.channel());
+    #ifndef PRODUCTION
+      Serial.print(ch_ch); Serial.print(" "); Serial.println(WiFi.channel());
+    #endif
+
+    Udp.beginPacket(remoteIP, destPort);
+    rssi.send(Udp);
+    Udp.endPacket();
+    rssi.empty();
+
+    Udp.beginPacket(remoteIP, destPort);
+    rtime.send(Udp);
+    Udp.endPacket();
+    rtime.empty();
+
+    Udp.beginPacket(remoteIP, destPort);
+    ver.send(Udp);
+    Udp.endPacket();
+    ver.empty();
+
+    Udp.beginPacket(remoteIP, destPort);
+    channel.send(Udp);
+    Udp.endPacket();
+    channel.empty();
+
+  #ifndef PRODUCTION
+    Serial.println("\n\r--- OSC sent ---");
+  #endif
 }
