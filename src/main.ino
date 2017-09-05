@@ -1,5 +1,5 @@
 //******************************************************************************
-#define FIRMWARE_VERSION 1.2  //MAJOR.MINOR more info on: http://semver.org
+#define FIRMWARE_VERSION 1.3  //MAJOR.MINOR more info on: http://semver.org
 #define PROJECT "health_monitor"
 #define SERIAL_SPEED 9600       // 9600 for BLE friend
 #define HOSTNAME "monitor"
@@ -39,6 +39,8 @@ const unsigned int localPort = 8888;        // local port to listen for OSC pack
 unsigned long previousMillis = 0;
 unsigned long currentMillis, runningTime;
 
+char header[16];    //OSC message header updated with unit ID
+char volt_ch[8];
 
 void setup()
 {
@@ -63,6 +65,8 @@ void setup()
   Serial.print( F("Vcc: ") ); Serial.println(ESP.getVcc());
   Serial.println();
 #endif
+
+sprintf(header, "/%i/", UNIT_ID);
 
 //---------------------------- WiFi --------------------------------------------
 WiFi.mode(WIFI_STA);  // https://www.arduino.cc/en/Reference/WiFiConfig
@@ -132,6 +136,17 @@ ArduinoOTA.begin();
 void loop() {
   ArduinoOTA.handle();
 
+  volt_ch[0] = {0}; //reset buffor
+  strcat(volt_ch, header);
+  strcat(volt_ch, "voltage"); //build OSC message with unit ID
+  OSCMessage voltage(volt_ch);
+  voltage.add(analogRead(A0));
+  Udp.beginPacket(remoteIP, destPort);
+  voltage.send(Udp);
+  Udp.endPacket();
+  voltage.empty();
+  delay(50);
+
   currentMillis = millis();
   if (currentMillis - previousMillis >= (REPORT_INTERVAL)) {
     previousMillis = currentMillis;
@@ -143,8 +158,6 @@ void sendReport(){
   #ifndef PRODUCTION
     Serial.println("\n\r--- Sending OSC status ---");
   #endif
-    char header[16];
-    sprintf(header, "/%i/", UNIT_ID);
 
     //rssi
     char rssi_ch[32];
