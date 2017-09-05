@@ -25,7 +25,7 @@ extern "C"{
 //   Sketch    OTA update   File system   EEPROM  WiFi config (SDK)
 
 // -------------------- OSC libraries ------------------------------------------
-#include <OSCMessage.h>
+#include <OSCMessage.h>       // https://github.com/CNMAT/OSC.git
 #include <OSCBundle.h>
 #include <OSCData.h>
 
