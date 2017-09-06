@@ -35,7 +35,7 @@ const IPAddress remoteIP(192,168,188,255);        // remote IP of your computer,
 const unsigned int destPort = 9999;          // remote port to receive OSC
 const unsigned int localPort = 8888;        // local port to listen for OSC packets
 
-#define REPORT_INTERVAL 1000 * 3      //OSC report inerval 3 secs
+#define REPORT_INTERVAL 1000 * 5      //OSC report inerval 3 secs
 unsigned long previousMillis = 0;
 unsigned long currentMillis, runningTime;
 
@@ -65,8 +65,6 @@ void setup()
   Serial.print( F("Vcc: ") ); Serial.println(ESP.getVcc());
   Serial.println();
 #endif
-
-sprintf(header, "/%i/", UNIT_ID);
 
 //---------------------------- WiFi --------------------------------------------
 WiFi.mode(WIFI_STA);  // https://www.arduino.cc/en/Reference/WiFiConfig
@@ -136,6 +134,7 @@ ArduinoOTA.begin();
 void loop() {
   ArduinoOTA.handle();
 
+  sprintf(header, "/%i/", UNIT_ID);
   volt_ch[0] = {0}; //reset buffor
   strcat(volt_ch, header);
   strcat(volt_ch, "voltage"); //build OSC message with unit ID

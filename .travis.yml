@@ -19,7 +19,6 @@
 # Travis CI documentation (see above).
 #
 
-
 #
 # Template #1: General project. Test it using existing `platformio.ini`.
 #
