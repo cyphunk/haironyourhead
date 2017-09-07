@@ -55,13 +55,13 @@ sprintf(oscMsgHeader, "/%i", UNIT_ID);   // for sending OSC messages: /xxx/messa
 #ifndef PRODUCTION
   Serial.begin(SERIAL_SPEED);
   // compiling info
-  Serial.println("\r\n--------------------------------"); //NOTE \r\n - new line, return
+  Serial.println("\r\n--------------------------------");                       
   Serial.print("Project: "); Serial.println(PROJECT);
   Serial.print("Version: "); Serial.print(FIRMWARE_VERSION); Serial.println(" by Grzegorz Zajac");
   Serial.println("Compiled: " __DATE__ ", " __TIME__ ", " __VERSION__);
   Serial.println("---------------------------------");
   Serial.println("ESP Info: ");
-  Serial.print( F("Heap: ") ); Serial.println(system_get_free_heap_size()); //IDEA add code size and free ram info
+  Serial.print( F("Heap: ") ); Serial.println(system_get_free_heap_size());
   Serial.print( F("Boot Vers: ") ); Serial.println(system_get_boot_version());
   Serial.print( F("CPU: ") ); Serial.println(system_get_cpu_freq());
   Serial.print( F("SDK: ") ); Serial.println(system_get_sdk_version());
@@ -82,7 +82,7 @@ leds[0] = CRGB( 0, 10, 0); FastLED.show();
 WiFi.mode(WIFI_STA);  // https://www.arduino.cc/en/Reference/WiFiConfig
 IPAddress ip(192,168,188,UNIT_ID); //ip address of the unit
 // ---------------------------------------------------------------------------
-IPAddress gateway(192,168,188,1);
+IPAddress gateway(192,168,188,1);                                                //TODO move netowrk data to creditential, ip addres?
 IPAddress subnet(255,255,255,0);
 WiFi.config(ip, gateway, subnet);
 
@@ -101,7 +101,7 @@ while (WiFi.waitForConnectResult() != WL_CONNECTED) {
 }
 
 // --------------------------- OTA ---------------------------------------------
-char buf[30]; buf[0] = {0};   //TODO tidy up
+char buf[30]; buf[0] = {0};                                                     //TODO tidy up
 char id[4]; id[0] = {0};
 strcat(buf, HOSTNAME);
 sprintf(id, "_%i", UNIT_ID);
@@ -160,7 +160,7 @@ void loop() {
   OSCMsgReceive();
 
   OSCsendAD();
-  delay(50);
+  delay(50);                                                                    //TODO swap for millis()
 
   currentMillis = millis();
   if (currentMillis - previousMillis >= (REPORT_INTERVAL)) {
@@ -177,7 +177,7 @@ void OSCMsgReceive(){
       msgIN.fill(Udp.read());
     if(!msgIN.hasError()){
       msgIN.route(oscMsgHeader, led);
-      //msgIN.dispatch(oscMsgHeader, led); //keep it for ping option
+      //msgIN.dispatch(oscMsgHeader, led);      //for ping option
     } else {
       error = msgIN.getError();
       #ifndef PRODUCTION // Not in PRODUCTION
@@ -209,7 +209,7 @@ void OSCsendAD(){
   char volt_ch[8];
   volt_ch[0] = {0}; //reset buffor
   strcat(volt_ch, oscMsgHeader);
-  strcat(volt_ch, "voltage"); //build OSC message with unit ID      //TODO to check
+  strcat(volt_ch, "voltage"); //build OSC message with unit ID
   OSCMessage voltage(volt_ch);
   voltage.add(analogRead(A0));
   Udp.beginPacket(remoteIP, destPort);
