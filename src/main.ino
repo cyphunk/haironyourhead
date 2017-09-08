@@ -46,6 +46,9 @@ char oscMsgHeader[16];    //OSC message header updated with unit ID
 #define DATA_PIN 14 //D5    pin for neopixel
 CRGB leds[NUM_LEDS];
 
+#include <Wire.h>
+#include <Adafruit_ADS1015.h>
+Adafruit_ADS1115 ads;  /* Use this for the 16-bit version */
 
 void setup()
 {
@@ -55,7 +58,7 @@ sprintf(oscMsgHeader, "/%i", UNIT_ID);   // for sending OSC messages: /xxx/messa
 #ifndef PRODUCTION
   Serial.begin(SERIAL_SPEED);
   // compiling info
-  Serial.println("\r\n--------------------------------");                       
+  Serial.println("\r\n--------------------------------");
   Serial.print("Project: "); Serial.println(PROJECT);
   Serial.print("Version: "); Serial.print(FIRMWARE_VERSION); Serial.println(" by Grzegorz Zajac");
   Serial.println("Compiled: " __DATE__ ", " __TIME__ ", " __VERSION__);
@@ -150,6 +153,24 @@ Udp.begin(localPort);
 #ifndef PRODUCTION // Not in PRODUCTION
   Serial.print("IP address: "); Serial.println(WiFi.localIP());
 #endif
+
+//------------------------------ ADc -------------------------------------------
+#ifndef PRODUCTION // Not in PRODUCTION
+  Serial.println("Getting single-ended readings from AIN0..3");
+  Serial.println("ADC Range: +/- 6.144V (1 bit = 3mV/ADS1015, 0.1875mV/ADS1115)");
+#endif
+//                                                                ADS1015  ADS1115
+//                                                                -------  -------
+    ads.setGain(GAIN_TWOTHIRDS);  // 2/3x gain +/- 6.144V  1 bit = 3mV      0.1875mV (default)
+// ads.setGain(GAIN_ONE);        // 1x gain   +/- 4.096V  1 bit = 2mV      0.125mV
+// ads.setGain(GAIN_TWO);        // 2x gain   +/- 2.048V  1 bit = 1mV      0.0625mV
+// ads.setGain(GAIN_FOUR);       // 4x gain   +/- 1.024V  1 bit = 0.5mV    0.03125mV
+// ads.setGain(GAIN_EIGHT);      // 8x gain   +/- 0.512V  1 bit = 0.25mV   0.015625mV
+// ads.setGain(GAIN_SIXTEEN);    // 16x gain  +/- 0.256V  1 bit = 0.125mV  0.0078125mV
+ads.begin();
+
+
+
 leds[0] = CRGB(10, 0, 0); FastLED.show();
 delay(500);
 leds[0] = CRGB(0, 0, 0); FastLED.show();
@@ -161,6 +182,19 @@ void loop() {
 
   OSCsendAD();
   delay(50);                                                                    //TODO swap for millis()
+
+  int16_t adc0, adc1, adc2, adc3;
+  adc0 = ads.readADC_SingleEnded(0);
+  adc1 = ads.readADC_SingleEnded(1);
+  adc2 = ads.readADC_SingleEnded(2);
+  adc3 = ads.readADC_SingleEnded(3);
+  #ifndef PRODUCTION // Not in PRODUCTION
+    Serial.print("AIN0: "); Serial.println(adc0);
+    Serial.print("AIN1: "); Serial.println(adc1);
+    Serial.print("AIN2: "); Serial.println(adc2);
+    Serial.print("AIN3: "); Serial.println(adc3);
+    Serial.println(" ");
+  #endif
 
   currentMillis = millis();
   if (currentMillis - previousMillis >= (REPORT_INTERVAL)) {
