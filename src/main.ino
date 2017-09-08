@@ -35,7 +35,7 @@ const IPAddress remoteIP(192,168,188,255);        // remote IP of your computer,
 const unsigned int destPort = 9999;          // remote port to receive OSC
 const unsigned int localPort = 8888;        // local port to listen for OSC packets
 
-#define REPORT_INTERVAL 1000 * 3      //OSC report inerval 3 secs
+#define REPORT_INTERVAL 1000 * 5      //OSC report inerval 3 secs
 unsigned long previousMillis = 0;
 unsigned long currentMillis, runningTime;
 
@@ -46,6 +46,10 @@ char oscMsgHeader[16];    //OSC message header updated with unit ID
 #define DATA_PIN 14 //D5    pin for neopixel
 CRGB leds[NUM_LEDS];
 
+#include <Wire.h>
+#include <Adafruit_ADS1015.h>
+Adafruit_ADS1115 ads;  /* Use this for the 16-bit version */
+float ADresolution = 0;
 
 void setup()
 {
@@ -55,7 +59,7 @@ sprintf(oscMsgHeader, "/%i", UNIT_ID);   // for sending OSC messages: /xxx/messa
 #ifndef PRODUCTION
   Serial.begin(SERIAL_SPEED);
   // compiling info
-  Serial.println("\r\n--------------------------------");                       
+  Serial.println("\r\n--------------------------------");
   Serial.print("Project: "); Serial.println(PROJECT);
   Serial.print("Version: "); Serial.print(FIRMWARE_VERSION); Serial.println(" by Grzegorz Zajac");
   Serial.println("Compiled: " __DATE__ ", " __TIME__ ", " __VERSION__);
@@ -150,6 +154,25 @@ Udp.begin(localPort);
 #ifndef PRODUCTION // Not in PRODUCTION
   Serial.print("IP address: "); Serial.println(WiFi.localIP());
 #endif
+
+//------------------------------ ADc -------------------------------------------
+#ifndef PRODUCTION // Not in PRODUCTION
+  Serial.println("Getting single-ended readings from AIN0..3");
+  Serial.println("ADC Range: +/- 6.144V (1 bit = 3mV/ADS1015, 0.1875mV/ADS1115)");
+#endif
+//                                                                ADS1015  ADS1115
+//                                                                -------  -------
+ads.setGain(GAIN_TWOTHIRDS);      // 2/3x gain +/- 6.144V  1 bit = 3mV      0.1875mV (default)
+ADresolution = 0.1875;
+// ads.setGain(GAIN_ONE);        // 1x gain   +/- 4.096V  1 bit = 2mV      0.125mV
+// ads.setGain(GAIN_TWO);        // 2x gain   +/- 2.048V  1 bit = 1mV      0.0625mV
+// ads.setGain(GAIN_FOUR);       // 4x gain   +/- 1.024V  1 bit = 0.5mV    0.03125mV
+// ads.setGain(GAIN_EIGHT);      // 8x gain   +/- 0.512V  1 bit = 0.25mV   0.015625mV
+// ads.setGain(GAIN_SIXTEEN);    // 16x gain  +/- 0.256V  1 bit = 0.125mV  0.0078125mV
+ads.begin();
+
+
+
 leds[0] = CRGB(10, 0, 0); FastLED.show();
 delay(500);
 leds[0] = CRGB(0, 0, 0); FastLED.show();
@@ -158,8 +181,7 @@ leds[0] = CRGB(0, 0, 0); FastLED.show();
 void loop() {
   ArduinoOTA.handle();
   OSCMsgReceive();
-
-  OSCsendAD();
+  AD2OSC();
   delay(50);                                                                    //TODO swap for millis()
 
   currentMillis = millis();
@@ -167,6 +189,31 @@ void loop() {
     previousMillis = currentMillis;
     sendReport();
   }
+}
+
+void AD2OSC(){
+  float adc0, adc1, adc2, adc3;
+  adc0 = ((ads.readADC_SingleEnded(0) * ADresolution)/1000);  //get results in V
+  adc1 = ((ads.readADC_SingleEnded(1) * ADresolution)/1000);
+  adc2 = ((ads.readADC_SingleEnded(2) * ADresolution)/1000);
+  adc3 = ((ads.readADC_SingleEnded(3) * ADresolution)/1000);
+  // #ifndef PRODUCTION // Not in PRODUCTION
+  //   Serial.print("AIN0: "); Serial.println(adc0);
+  //   Serial.print("AIN1: "); Serial.println(adc1);
+  //   Serial.print("AIN2: "); Serial.println(adc2);
+  //   Serial.print("AIN3: "); Serial.println(adc3);
+  //   Serial.println(" ");
+  // #endif
+  char volt_ch[8];
+  volt_ch[0] = {0}; //reset buffor
+  strcat(volt_ch, oscMsgHeader);
+  strcat(volt_ch, "/voltage"); //build OSC message with unit ID
+  OSCMessage voltage(volt_ch);
+  voltage.add(adc0);
+  Udp.beginPacket(remoteIP, destPort);
+  voltage.send(Udp);
+  Udp.endPacket();
+  voltage.empty();
 }
 
 void OSCMsgReceive(){
@@ -203,19 +250,6 @@ void led(OSCMessage &msg, int addrOffset) {
 
   leds[0] = CRGB(R, G, B);//CRGB::Red;
   FastLED.show();
-}
-
-void OSCsendAD(){
-  char volt_ch[8];
-  volt_ch[0] = {0}; //reset buffor
-  strcat(volt_ch, oscMsgHeader);
-  strcat(volt_ch, "voltage"); //build OSC message with unit ID
-  OSCMessage voltage(volt_ch);
-  voltage.add(analogRead(A0));
-  Udp.beginPacket(remoteIP, destPort);
-  voltage.send(Udp);
-  Udp.endPacket();
-  voltage.empty();
 }
 
 void sendReport(){
