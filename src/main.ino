@@ -1,5 +1,5 @@
 //******************************************************************************
-#define FIRMWARE_VERSION 1.4  //MAJOR.MINOR more info on: http://semver.org
+#define FIRMWARE_VERSION 1.5  //MAJOR.MINOR more info on: http://semver.org
 #define PROJECT "health_monitor"
 #define SERIAL_SPEED 9600       // 9600 for BLE friend
 #define HOSTNAME "monitor"
@@ -31,8 +31,9 @@ extern "C"{
 
 WiFiUDP Udp;
 OSCErrorCode error;
+// OSC IP and port settings in credentials.h
 
-#define REPORT_INTERVAL 1000 * 5      //OSC report inerval 3 secs
+#define REPORT_INTERVAL 1000 * 3      //OSC report inerval 3 secs
 #define MEASURMENT_INTERVAL 50       //AD measurment inerval
 unsigned long previousMillisReport = 0;
 unsigned long previousMillisMeasurment = 0;
@@ -78,7 +79,6 @@ sprintf(oscMsgHeader, "/%i", UNIT_ID);   // for sending OSC messages: /xxx/messa
 #endif
 
 // initialize neopixel
-// FastLED.addLeds<NEOPIXEL, DATA_PIN, RGB>(leds, NUM_LEDS);
 FastLED.addLeds<WS2812, DATA_PIN, RGB>(leds, NUM_LEDS);
 FastLED.showColor(CHSV(HUE_GREEN, 255, 100));
 
@@ -167,7 +167,7 @@ ADresolution = 0.1875;
 ads.begin();
 
 
-FastLED.showColor(CHSV(HUE_GREEN, 255, 200));
+FastLED.showColor(CHSV(HUE_GREEN, 255, 100));
 delay(500);
 FastLED.showColor(CHSV(HUE_GREEN, 255, 0));
 }
@@ -191,21 +191,15 @@ void loop() {
 
 void AD2OSC(){
   float adc0, adc1, adc2, adc3;
-  adc0 = ((ads.readADC_SingleEnded(0) * ADresolution)/1000);  //get results in V
-  adc1 = ((ads.readADC_SingleEnded(1) * ADresolution)/1000);
+  adc0 = ((ads.readADC_SingleEnded(0) * ADresolution)/1000);  // GSR
+  adc1 = ((ads.readADC_SingleEnded(1) * ADresolution)/1000);  //Heart Rate
   adc2 = ((ads.readADC_SingleEnded(2) * ADresolution)/1000);
   adc3 = ((ads.readADC_SingleEnded(3) * ADresolution)/1000);
-  // #ifndef PRODUCTION // Not in PRODUCTION
-  //   Serial.print("AIN0: "); Serial.println(adc0);
-  //   Serial.print("AIN1: "); Serial.println(adc1);
-  //   Serial.print("AIN2: "); Serial.println(adc2);
-  //   Serial.print("AIN3: "); Serial.println(adc3);
-  //   Serial.println(" ");
-  // #endif
+
   char volt_ch1[8];
   volt_ch1[0] = {0}; //reset buffor
   strcat(volt_ch1, oscMsgHeader);
-  strcat(volt_ch1, "/voltage1"); //build OSC message with unit ID
+  strcat(volt_ch1, "/gsr"); //build OSC message with unit ID
   OSCMessage voltage1(volt_ch1);
   voltage1.add(adc0);
   Udp.beginPacket(remoteIP, destPort);
@@ -216,7 +210,7 @@ void AD2OSC(){
   char volt_ch2[8];
   volt_ch2[0] = {0}; //reset buffor
   strcat(volt_ch2, oscMsgHeader);
-  strcat(volt_ch2, "/voltage2"); //build OSC message with unit ID
+  strcat(volt_ch2, "/hr"); //build OSC message with unit ID
   OSCMessage voltage2(volt_ch2);
   voltage2.add(adc1);
   Udp.beginPacket(remoteIP, destPort);
@@ -246,18 +240,18 @@ void OSCMsgReceive(){
 }
 
 void led(OSCMessage &msg, int addrOffset) {
-  float R = (msg.getFloat(0) * 255);
-  float G = (msg.getFloat(1) * 255);
-  float B = (msg.getFloat(2) * 255);
+  int R = roundf(msg.getFloat(0) * 255);
+  int G = roundf(msg.getFloat(1) * 255);
+  int B = roundf(msg.getFloat(2) * 255);
 
-  #ifndef PRODUCTION
-    Serial.print("RGB received:");
-    Serial.print(" "); Serial.print(R);
-    Serial.print(" "); Serial.print(G);
-    Serial.print(" "); Serial.println(B);
-  #endif
+  // #ifndef PRODUCTION
+  //   Serial.print("RGB received:");
+  //   Serial.print(" "); Serial.print(R);
+  //   Serial.print(" "); Serial.print(G);
+  //   Serial.print(" "); Serial.println(B);
+  // #endif
 
-  leds[0] = CRGB(R, G, B);//CRGB::Red;
+  leds[0] = CRGB(R, G, B);
   FastLED.show();
   // FastLED.showColor(CHSV(H, S, V));
 }
