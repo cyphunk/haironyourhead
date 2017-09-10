@@ -1,5 +1,5 @@
 //******************************************************************************
-#define FIRMWARE_VERSION 1.4  //MAJOR.MINOR more info on: http://semver.org
+#define FIRMWARE_VERSION 1.5  //MAJOR.MINOR more info on: http://semver.org
 #define PROJECT "health_monitor"
 #define SERIAL_SPEED 9600       // 9600 for BLE friend
 #define HOSTNAME "monitor"
@@ -31,13 +31,13 @@ extern "C"{
 
 WiFiUDP Udp;
 OSCErrorCode error;
-const IPAddress remoteIP(192,168,188,255);        // remote IP of your computer, 255 to multicast
-const unsigned int destPort = 9999;          // remote port to receive OSC
-const unsigned int localPort = 8888;        // local port to listen for OSC packets
+// OSC IP and port settings in credentials.h
 
-#define REPORT_INTERVAL 1000 * 5      //OSC report inerval 3 secs
-unsigned long previousMillis = 0;
-unsigned long currentMillis, runningTime;
+#define REPORT_INTERVAL 1000 * 3      //OSC report inerval 3 secs
+#define MEASURMENT_INTERVAL 50       //AD measurment inerval
+unsigned long previousMillisReport = 0;
+unsigned long previousMillisMeasurment = 0;
+unsigned long currentMillisReport, currentMillisMeasurment, runningTime;
 
 char oscMsgHeader[16];    //OSC message header updated with unit ID
 
@@ -79,15 +79,11 @@ sprintf(oscMsgHeader, "/%i", UNIT_ID);   // for sending OSC messages: /xxx/messa
 #endif
 
 // initialize neopixel
-FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
-leds[0] = CRGB( 0, 10, 0); FastLED.show();
+FastLED.addLeds<WS2812, DATA_PIN, RGB>(leds, NUM_LEDS);
+FastLED.showColor(CHSV(HUE_GREEN, 255, 100));
 
 //---------------------------- WiFi --------------------------------------------
 WiFi.mode(WIFI_STA);  // https://www.arduino.cc/en/Reference/WiFiConfig
-IPAddress ip(192,168,188,UNIT_ID); //ip address of the unit
-// ---------------------------------------------------------------------------
-IPAddress gateway(192,168,188,1);                                                //TODO move netowrk data to creditential, ip addres?
-IPAddress subnet(255,255,255,0);
 WiFi.config(ip, gateway, subnet);
 
 #ifndef PRODUCTION // Not in PRODUCTION
@@ -125,17 +121,16 @@ ArduinoOTA.onEnd([]() {
 #ifndef PRODUCTION // Not in PRODUCTION
   Serial.println("\nEnd");
 #endif
-leds[0] = CRGB(0, 0, 30); FastLED.show();
+FastLED.showColor(CHSV(HUE_ORANGE, 255, 200));
 
 });
 ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
 #ifndef PRODUCTION // Not in PRODUCTION
   Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
 #endif
-leds[0] = CRGB(0, 0, 10); FastLED.show();
+FastLED.showColor(CHSV(HUE_BLUE, 255, 100));
 delay(1);
-leds[0] = CRGB(0, 0, 0); FastLED.show();
-
+FastLED.showColor(CHSV(HUE_BLUE, 255, 0));
 
 });
 ArduinoOTA.onError([](ota_error_t error) {
@@ -172,48 +167,56 @@ ADresolution = 0.1875;
 ads.begin();
 
 
-
-leds[0] = CRGB(10, 0, 0); FastLED.show();
+FastLED.showColor(CHSV(HUE_GREEN, 255, 100));
 delay(500);
-leds[0] = CRGB(0, 0, 0); FastLED.show();
+FastLED.showColor(CHSV(HUE_GREEN, 255, 0));
 }
 
 void loop() {
   ArduinoOTA.handle();
   OSCMsgReceive();
-  AD2OSC();
-  delay(50);                                                                    //TODO swap for millis()
 
-  currentMillis = millis();
-  if (currentMillis - previousMillis >= (REPORT_INTERVAL)) {
-    previousMillis = currentMillis;
+  currentMillisMeasurment = millis();
+  if (currentMillisMeasurment - previousMillisMeasurment >= (MEASURMENT_INTERVAL)) {
+    previousMillisMeasurment = currentMillisMeasurment;
+    AD2OSC();
+  }
+
+  currentMillisReport = millis();
+  if (currentMillisReport - previousMillisReport >= (REPORT_INTERVAL)) {
+    previousMillisReport = currentMillisReport;
     sendReport();
   }
 }
 
 void AD2OSC(){
   float adc0, adc1, adc2, adc3;
-  adc0 = ((ads.readADC_SingleEnded(0) * ADresolution)/1000);  //get results in V
-  adc1 = ((ads.readADC_SingleEnded(1) * ADresolution)/1000);
+  adc0 = ((ads.readADC_SingleEnded(0) * ADresolution)/1000);  // GSR
+  adc1 = ((ads.readADC_SingleEnded(1) * ADresolution)/1000);  //Heart Rate
   adc2 = ((ads.readADC_SingleEnded(2) * ADresolution)/1000);
   adc3 = ((ads.readADC_SingleEnded(3) * ADresolution)/1000);
-  // #ifndef PRODUCTION // Not in PRODUCTION
-  //   Serial.print("AIN0: "); Serial.println(adc0);
-  //   Serial.print("AIN1: "); Serial.println(adc1);
-  //   Serial.print("AIN2: "); Serial.println(adc2);
-  //   Serial.print("AIN3: "); Serial.println(adc3);
-  //   Serial.println(" ");
-  // #endif
-  char volt_ch[8];
-  volt_ch[0] = {0}; //reset buffor
-  strcat(volt_ch, oscMsgHeader);
-  strcat(volt_ch, "/voltage"); //build OSC message with unit ID
-  OSCMessage voltage(volt_ch);
-  voltage.add(adc0);
+
+  char volt_ch1[8];
+  volt_ch1[0] = {0}; //reset buffor
+  strcat(volt_ch1, oscMsgHeader);
+  strcat(volt_ch1, "/gsr"); //build OSC message with unit ID
+  OSCMessage voltage1(volt_ch1);
+  voltage1.add(adc0);
   Udp.beginPacket(remoteIP, destPort);
-  voltage.send(Udp);
+  voltage1.send(Udp);
   Udp.endPacket();
-  voltage.empty();
+  voltage1.empty();
+
+  char volt_ch2[8];
+  volt_ch2[0] = {0}; //reset buffor
+  strcat(volt_ch2, oscMsgHeader);
+  strcat(volt_ch2, "/hr"); //build OSC message with unit ID
+  OSCMessage voltage2(volt_ch2);
+  voltage2.add(adc1);
+  Udp.beginPacket(remoteIP, destPort);
+  voltage2.send(Udp);
+  Udp.endPacket();
+  voltage2.empty();
 }
 
 void OSCMsgReceive(){
@@ -237,19 +240,20 @@ void OSCMsgReceive(){
 }
 
 void led(OSCMessage &msg, int addrOffset) {
-  int R = msg.getInt(0);
-  int G = msg.getInt(1);
-  int B = msg.getInt(2);
+  int R = roundf(msg.getFloat(0) * 255);
+  int G = roundf(msg.getFloat(1) * 255);
+  int B = roundf(msg.getFloat(2) * 255);
 
-  #ifndef PRODUCTION
-    Serial.print("RGB received:");
-    Serial.print(" "); Serial.print(R);
-    Serial.print(" "); Serial.print(G);
-    Serial.print(" "); Serial.println(B);
-  #endif
+  // #ifndef PRODUCTION
+  //   Serial.print("RGB received:");
+  //   Serial.print(" "); Serial.print(R);
+  //   Serial.print(" "); Serial.print(G);
+  //   Serial.print(" "); Serial.println(B);
+  // #endif
 
-  leds[0] = CRGB(R, G, B);//CRGB::Red;
+  leds[0] = CRGB(R, G, B);
   FastLED.show();
+  // FastLED.showColor(CHSV(H, S, V));
 }
 
 void sendReport(){
