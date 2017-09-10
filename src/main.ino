@@ -31,9 +31,6 @@ extern "C"{
 
 WiFiUDP Udp;
 OSCErrorCode error;
-const IPAddress remoteIP(192,168,188,255);        // remote IP of your computer, 255 to multicast
-const unsigned int destPort = 9999;          // remote port to receive OSC
-const unsigned int localPort = 8888;        // local port to listen for OSC packets
 
 #define REPORT_INTERVAL 1000 * 5      //OSC report inerval 3 secs
 #define MEASURMENT_INTERVAL 50       //AD measurment inerval
@@ -81,15 +78,12 @@ sprintf(oscMsgHeader, "/%i", UNIT_ID);   // for sending OSC messages: /xxx/messa
 #endif
 
 // initialize neopixel
-FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
-leds[0] = CRGB( 0, 10, 0); FastLED.show();
+// FastLED.addLeds<NEOPIXEL, DATA_PIN, RGB>(leds, NUM_LEDS);
+FastLED.addLeds<WS2812, DATA_PIN, RGB>(leds, NUM_LEDS);
+FastLED.showColor(CHSV(HUE_GREEN, 255, 100));
 
 //---------------------------- WiFi --------------------------------------------
 WiFi.mode(WIFI_STA);  // https://www.arduino.cc/en/Reference/WiFiConfig
-IPAddress ip(192,168,188,UNIT_ID); //ip address of the unit
-// ---------------------------------------------------------------------------
-IPAddress gateway(192,168,188,1);                                                //TODO move netowrk data to creditential, ip addres?
-IPAddress subnet(255,255,255,0);
 WiFi.config(ip, gateway, subnet);
 
 #ifndef PRODUCTION // Not in PRODUCTION
@@ -127,17 +121,16 @@ ArduinoOTA.onEnd([]() {
 #ifndef PRODUCTION // Not in PRODUCTION
   Serial.println("\nEnd");
 #endif
-leds[0] = CRGB(0, 0, 30); FastLED.show();
+FastLED.showColor(CHSV(HUE_ORANGE, 255, 200));
 
 });
 ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
 #ifndef PRODUCTION // Not in PRODUCTION
   Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
 #endif
-leds[0] = CRGB(0, 0, 10); FastLED.show();
+FastLED.showColor(CHSV(HUE_BLUE, 255, 100));
 delay(1);
-leds[0] = CRGB(0, 0, 0); FastLED.show();
-
+FastLED.showColor(CHSV(HUE_BLUE, 255, 0));
 
 });
 ArduinoOTA.onError([](ota_error_t error) {
@@ -174,10 +167,9 @@ ADresolution = 0.1875;
 ads.begin();
 
 
-
-leds[0] = CRGB(10, 0, 0); FastLED.show();
+FastLED.showColor(CHSV(HUE_GREEN, 255, 200));
 delay(500);
-leds[0] = CRGB(0, 0, 0); FastLED.show();
+FastLED.showColor(CHSV(HUE_GREEN, 255, 0));
 }
 
 void loop() {
@@ -254,9 +246,9 @@ void OSCMsgReceive(){
 }
 
 void led(OSCMessage &msg, int addrOffset) {
-  int R = msg.getInt(0);
-  int G = msg.getInt(1);
-  int B = msg.getInt(2);
+  float R = (msg.getFloat(0) * 255);
+  float G = (msg.getFloat(1) * 255);
+  float B = (msg.getFloat(2) * 255);
 
   #ifndef PRODUCTION
     Serial.print("RGB received:");
@@ -267,6 +259,7 @@ void led(OSCMessage &msg, int addrOffset) {
 
   leds[0] = CRGB(R, G, B);//CRGB::Red;
   FastLED.show();
+  // FastLED.showColor(CHSV(H, S, V));
 }
 
 void sendReport(){
