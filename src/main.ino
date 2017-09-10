@@ -204,16 +204,27 @@ void AD2OSC(){
   //   Serial.print("AIN3: "); Serial.println(adc3);
   //   Serial.println(" ");
   // #endif
-  char volt_ch[8];
-  volt_ch[0] = {0}; //reset buffor
-  strcat(volt_ch, oscMsgHeader);
-  strcat(volt_ch, "/voltage"); //build OSC message with unit ID
-  OSCMessage voltage(volt_ch);
-  voltage.add(adc0);
+  char volt_ch1[8];
+  volt_ch1[0] = {0}; //reset buffor
+  strcat(volt_ch1, oscMsgHeader);
+  strcat(volt_ch1, "/voltage1"); //build OSC message with unit ID
+  OSCMessage voltage1(volt_ch1);
+  voltage1.add(adc0);
   Udp.beginPacket(remoteIP, destPort);
-  voltage.send(Udp);
+  voltage1.send(Udp);
   Udp.endPacket();
-  voltage.empty();
+  voltage1.empty();
+
+  char volt_ch2[8];
+  volt_ch2[0] = {0}; //reset buffor
+  strcat(volt_ch2, oscMsgHeader);
+  strcat(volt_ch2, "/voltage2"); //build OSC message with unit ID
+  OSCMessage voltage2(volt_ch2);
+  voltage2.add(adc1);
+  Udp.beginPacket(remoteIP, destPort);
+  voltage2.send(Udp);
+  Udp.endPacket();
+  voltage2.empty();
 }
 
 void OSCMsgReceive(){
