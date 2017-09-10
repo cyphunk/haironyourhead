@@ -36,8 +36,10 @@ const unsigned int destPort = 9999;          // remote port to receive OSC
 const unsigned int localPort = 8888;        // local port to listen for OSC packets
 
 #define REPORT_INTERVAL 1000 * 5      //OSC report inerval 3 secs
-unsigned long previousMillis = 0;
-unsigned long currentMillis, runningTime;
+#define MEASURMENT_INTERVAL 50       //AD measurment inerval
+unsigned long previousMillisReport = 0;
+unsigned long previousMillisMeasurment = 0;
+unsigned long currentMillisReport, currentMillisMeasurment, runningTime;
 
 char oscMsgHeader[16];    //OSC message header updated with unit ID
 
@@ -181,12 +183,16 @@ leds[0] = CRGB(0, 0, 0); FastLED.show();
 void loop() {
   ArduinoOTA.handle();
   OSCMsgReceive();
-  AD2OSC();
-  delay(50);                                                                    //TODO swap for millis()
 
-  currentMillis = millis();
-  if (currentMillis - previousMillis >= (REPORT_INTERVAL)) {
-    previousMillis = currentMillis;
+  currentMillisMeasurment = millis();
+  if (currentMillisMeasurment - previousMillisMeasurment >= (MEASURMENT_INTERVAL)) {
+    previousMillisMeasurment = currentMillisMeasurment;
+    AD2OSC();
+  }
+
+  currentMillisReport = millis();
+  if (currentMillisReport - previousMillisReport >= (REPORT_INTERVAL)) {
+    previousMillisReport = currentMillisReport;
     sendReport();
   }
 }
