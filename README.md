@@ -7,4 +7,4 @@ GSR sensor - https://www.seeedstudio.com/Grove-GSR-sensor-p-1614.html
 
 ESP measures GSR via AD and sends the value over OSC so far.
 Needs tiding up and optimizing.
-Add heart rate over I2C
+Add heart rate over I2C.
