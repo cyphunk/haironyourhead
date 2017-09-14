@@ -3,7 +3,7 @@
 #define PROJECT "health_monitor"
 #define SERIAL_SPEED 9600       // 9600 for BLE friend
 #define HOSTNAME "monitor"
-#define UNIT_ID 111             //last octet of IP
+#define UNIT_ID 113             //last octet of IP
 //#define PRODUCTION true       //uncoment to turn the serial debuging off
 //******************************************************************************
 
@@ -181,41 +181,57 @@ void loop() {
     AD2OSC();
   }
 
-  currentMillisReport = millis();
-  if (currentMillisReport - previousMillisReport >= (REPORT_INTERVAL)) {
-    previousMillisReport = currentMillisReport;
-    sendReport();
-  }
+  // currentMillisReport = millis();
+  // if (currentMillisReport - previousMillisReport >= (REPORT_INTERVAL)) {
+  //   previousMillisReport = currentMillisReport;
+  //   sendReport();
+  // }
 }
 
 void AD2OSC(){
-  int adc0;
-  adc0 = ads.readADC_SingleEnded(0);
-  adc0 = map(adc0, 0, 16384, 0, 1000);  // GSR
+  int adc0, adc1;
+  adc0 = normalize(0, 16384, ads.readADC_SingleEnded(0));
+  adc1 = normalize(0, 16384, ads.readADC_SingleEnded(1));
+
   char volt_ch1[8];
   volt_ch1[0] = {0}; //reset buffor
   strcat(volt_ch1, oscMsgHeader);
-  strcat(volt_ch1, "/gsr"); //build OSC message with unit ID
   OSCMessage voltage1(volt_ch1);
+  voltage1.add(adc1);
   voltage1.add(adc0);
   Udp.beginPacket(remoteIP, destPort);
   voltage1.send(Udp);
   Udp.endPacket();
   voltage1.empty();
+}
 
-  int adc1;
-  adc1 = ads.readADC_SingleEnded(1);
-  adc1 = map(adc1, 0, 16384, 0, 1000);
-  char volt_ch2[8];
-  volt_ch2[0] = {0}; //reset buffor
-  strcat(volt_ch2, oscMsgHeader);
-  strcat(volt_ch2, "/hr"); //build OSC message with unit ID
-  OSCMessage voltage2(volt_ch2);
-  voltage2.add(adc1);
-  Udp.beginPacket(remoteIP, destPort);
-  voltage2.send(Udp);
-  Udp.endPacket();
-  voltage2.empty();
+long sliding_min = -1;
+long sliding_max = -1;
+unsigned int step = 1;
+
+unsigned long normalize(unsigned long value_min, unsigned long value_max, unsigned long value) {
+    // ghetto callibration
+    // think of the sliding_min and sliding_max as two walls that are always closing in creating
+    // and more and more narrow hallway for the incoming value to fit in. when the value breaches
+    // those walls they are expanded by `step`. when the value is below those walls they are
+    // further enclosed by step
+
+    if (sliding_min < 0) sliding_min = value_min;
+    else if (value < sliding_min) sliding_min = value;
+    else if (value > sliding_min && sliding_min+step < sliding_max) sliding_min += step;
+
+    if (sliding_max < 0) sliding_max = value_max;
+    else if (value > sliding_max) sliding_max = value;
+    else if (value < sliding_max && sliding_max-step > sliding_min) sliding_max -= step;
+
+    unsigned long output;
+    // this calculation assumes we want a return value between 0 and 1000. We scale using value so as to avoid any need for float point
+    output = (value-sliding_min)*1000/(sliding_max-sliding_min);
+
+    // if you do not want to use the sliding window calibration method then uncomment the following
+    //output = (value*1000)/(value_max-value_min);
+
+    return output;
 }
 
 void OSCMsgReceive(){
