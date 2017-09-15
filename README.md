@@ -1,5 +1,5 @@
 # HealthMonitor
-Heart rate and GSR monitor based on ESP8266-12E.
+Pulse and GSR monitor based on ESP8266-12E.
 Work in progress.
 
 Pulse sensor - https://www.sparkfun.com/products/11574
