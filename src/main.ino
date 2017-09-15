@@ -26,7 +26,7 @@ extern "C"{
 
 // -------------------- OSC libraries ------------------------------------------
 #include <OSCMessage.h>       // https://github.com/CNMAT/OSC.git
-#include <OSCBundle.h>
+// #include <OSCBundle.h>
 #include <OSCData.h>
 
 WiFiUDP Udp;
@@ -51,6 +51,10 @@ CRGB leds[NUM_LEDS];
 Adafruit_ADS1115 ads;  /* Use this for the 16-bit version */
 float ADresolution = 0;
 
+long sliding_min = -1;
+long sliding_max = -1;
+unsigned int step = 1;
+
 void setup()
 {
 // generate string based on UNIT_ID
@@ -61,7 +65,7 @@ sprintf(oscMsgHeader, "/%i", UNIT_ID);   // for sending OSC messages: /xxx/messa
   // compiling info
   Serial.println("\r\n--------------------------------");
   Serial.print("Project: "); Serial.println(PROJECT);
-  Serial.print("Version: "); Serial.print(FIRMWARE_VERSION); Serial.println(" by Grzegorz Zajac");
+  Serial.print("Version: "); Serial.print(FIRMWARE_VERSION); Serial.println(" by Grzegorz Zajac and Nathan Andrew Fain");
   Serial.println("Compiled: " __DATE__ ", " __TIME__ ", " __VERSION__);
   Serial.println("---------------------------------");
   Serial.println("ESP Info: ");
@@ -181,11 +185,11 @@ void loop() {
     AD2OSC();
   }
 
-  // currentMillisReport = millis();
-  // if (currentMillisReport - previousMillisReport >= (REPORT_INTERVAL)) {
-  //   previousMillisReport = currentMillisReport;
-  //   sendReport();
-  // }
+  currentMillisReport = millis();
+  if (currentMillisReport - previousMillisReport >= (REPORT_INTERVAL)) {
+    previousMillisReport = currentMillisReport;
+    sendReport();                                                               //TODO send report to diffrent port or IP, separate from ISadora
+  }
 }
 
 void AD2OSC(){
@@ -204,10 +208,6 @@ void AD2OSC(){
   Udp.endPacket();
   voltage1.empty();
 }
-
-long sliding_min = -1;
-long sliding_max = -1;
-unsigned int step = 1;
 
 unsigned long normalize(unsigned long value_min, unsigned long value_max, unsigned long value) {
     // ghetto callibration
@@ -268,7 +268,6 @@ void led(OSCMessage &msg, int addrOffset) {
 
   leds[0] = CRGB(R, G, B);
   FastLED.show();
-  // FastLED.showColor(CHSV(H, S, V));
 }
 
 void sendReport(){
