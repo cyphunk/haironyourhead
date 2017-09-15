@@ -1,10 +1,6 @@
 # HealthMonitor
-Heart rate and GSR monitor based on ESP8266-12E.
+Pulse and GSR monitor based on ESP8266-12E.
 Work in progress.
 
-Heart rate sensor - https://www.seeedstudio.com/Grove-Finger-clip-Heart-Rate-Sensor-with-shell-p-2420.html
+Pulse sensor - https://www.sparkfun.com/products/11574
 GSR sensor - https://www.seeedstudio.com/Grove-GSR-sensor-p-1614.html
-
-ESP measures GSR via AD and sends the value over OSC so far.
-Needs tiding up and optimizing.
-Add heart rate over I2C.

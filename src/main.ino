@@ -1,9 +1,10 @@
 //******************************************************************************
-#define FIRMWARE_VERSION 1.5  //MAJOR.MINOR more info on: http://semver.org
+#define FIRMWARE_VERSION 1.6  //MAJOR.MINOR more info on: http://semver.org
 #define PROJECT "health_monitor"
 #define SERIAL_SPEED 9600       // 9600 for BLE friend
 #define HOSTNAME "monitor"
-#define UNIT_ID 111             //last octet of IP
+#define UNIT_ID 112             //last octet of IP
+//#define EXTERNAL_ADC         // uncomment for version with external ADc
 //#define PRODUCTION true       //uncoment to turn the serial debuging off
 //******************************************************************************
 
@@ -26,7 +27,7 @@ extern "C"{
 
 // -------------------- OSC libraries ------------------------------------------
 #include <OSCMessage.h>       // https://github.com/CNMAT/OSC.git
-#include <OSCBundle.h>
+// #include <OSCBundle.h>
 #include <OSCData.h>
 
 WiFiUDP Udp;
@@ -34,26 +35,34 @@ OSCErrorCode error;
 // OSC IP and port settings in credentials.h
 
 #define REPORT_INTERVAL 1000 * 3      //OSC report inerval 3 secs
-#define MEASURMENT_INTERVAL 50       //AD measurment inerval
+#define MEASURMENT_INTERVAL 5       //AD measurment inerval
 unsigned long previousMillisReport = 0;
 unsigned long previousMillisMeasurment = 0;
 unsigned long currentMillisReport, currentMillisMeasurment, runningTime;
 
-char oscMsgHeader[16];    //OSC message header updated with unit ID
+char oscMsgHeader[8];    //OSC message header updated with unit ID
 
 #include <FastLED.h>
 #define NUM_LEDS 1
 #define DATA_PIN 14 //D5    pin for neopixel
 CRGB leds[NUM_LEDS];
 
-#include <Wire.h>
-#include <Adafruit_ADS1015.h>
-Adafruit_ADS1115 ads;  /* Use this for the 16-bit version */
-float ADresolution = 0;
+#ifdef EXTERNAL_ADC
+  #include <Wire.h>
+  #include <Adafruit_ADS1015.h>
+  Adafruit_ADS1115 ads;  /* Use this for the 16-bit version */
+  float ADresolution = 0;
+#endif
+
+// normalize function variables
+long sliding_min = -1;
+long sliding_max = -1;
+unsigned int step = 1;
+
 
 void setup()
 {
-// generate string based on UNIT_ID
+// generate OSC header /xxx based on UNIT_ID
 sprintf(oscMsgHeader, "/%i", UNIT_ID);   // for sending OSC messages: /xxx/message value
 
 #ifndef PRODUCTION
@@ -61,7 +70,7 @@ sprintf(oscMsgHeader, "/%i", UNIT_ID);   // for sending OSC messages: /xxx/messa
   // compiling info
   Serial.println("\r\n--------------------------------");
   Serial.print("Project: "); Serial.println(PROJECT);
-  Serial.print("Version: "); Serial.print(FIRMWARE_VERSION); Serial.println(" by Grzegorz Zajac");
+  Serial.print("Version: "); Serial.print(FIRMWARE_VERSION); Serial.println(" by Grzegorz Zajac and Nathan Andrew Fain");
   Serial.println("Compiled: " __DATE__ ", " __TIME__ ", " __VERSION__);
   Serial.println("---------------------------------");
   Serial.println("ESP Info: ");
@@ -79,7 +88,7 @@ sprintf(oscMsgHeader, "/%i", UNIT_ID);   // for sending OSC messages: /xxx/messa
 #endif
 
 // initialize neopixel
-FastLED.addLeds<WS2812, DATA_PIN, RGB>(leds, NUM_LEDS);
+FastLED.addLeds<WS2812, DATA_PIN, GRB>(leds, NUM_LEDS);
 FastLED.showColor(CHSV(HUE_GREEN, 255, 100));
 
 //---------------------------- WiFi --------------------------------------------
@@ -104,9 +113,10 @@ while (WiFi.waitForConnectResult() != WL_CONNECTED) {
 char buf[30]; buf[0] = {0};                                                     //TODO tidy up
 char id[4]; id[0] = {0};
 strcat(buf, HOSTNAME);
-sprintf(id, "_%i", UNIT_ID);
+sprintf(id, "%i", UNIT_ID);
 strcat(buf,id);
 ArduinoOTA.setHostname(buf);
+
 #ifndef PRODUCTION // Not in PRODUCTION
   Serial.print("Hostname: "); Serial.println(buf);
 #endif
@@ -150,22 +160,16 @@ Udp.begin(localPort);
   Serial.print("IP address: "); Serial.println(WiFi.localIP());
 #endif
 
-//------------------------------ ADc -------------------------------------------
-#ifndef PRODUCTION // Not in PRODUCTION
-  Serial.println("Getting single-ended readings from AIN0..3");
-  Serial.println("ADC Range: +/- 6.144V (1 bit = 3mV/ADS1015, 0.1875mV/ADS1115)");
+//-------------------------- External ADc --------------------------------------
+#ifdef EXTERNAL_ADC
+  #ifndef PRODUCTION // Not in PRODUCTION
+    Serial.println("Getting single-ended readings from AIN0..3");
+    Serial.println("ADC Range: +/- 6.144V (1 bit = 0.1875mV/ADS1115)");
+  #endif
+  ads.setGain(GAIN_TWOTHIRDS);      // 2/3x gain +/- 6.144V       0.1875mV (default)
+  ADresolution = 0.1875;
+  ads.begin();
 #endif
-//                                                                ADS1015  ADS1115
-//                                                                -------  -------
-ads.setGain(GAIN_TWOTHIRDS);      // 2/3x gain +/- 6.144V  1 bit = 3mV      0.1875mV (default)
-ADresolution = 0.1875;
-// ads.setGain(GAIN_ONE);        // 1x gain   +/- 4.096V  1 bit = 2mV      0.125mV
-// ads.setGain(GAIN_TWO);        // 2x gain   +/- 2.048V  1 bit = 1mV      0.0625mV
-// ads.setGain(GAIN_FOUR);       // 4x gain   +/- 1.024V  1 bit = 0.5mV    0.03125mV
-// ads.setGain(GAIN_EIGHT);      // 8x gain   +/- 0.512V  1 bit = 0.25mV   0.015625mV
-// ads.setGain(GAIN_SIXTEEN);    // 16x gain  +/- 0.256V  1 bit = 0.125mV  0.0078125mV
-ads.begin();
-
 
 FastLED.showColor(CHSV(HUE_GREEN, 255, 100));
 delay(500);
@@ -185,38 +189,60 @@ void loop() {
   currentMillisReport = millis();
   if (currentMillisReport - previousMillisReport >= (REPORT_INTERVAL)) {
     previousMillisReport = currentMillisReport;
-    sendReport();
+    sendReport();                                                               //TODO send report to diffrent port or IP, separate from Isadora
   }
 }
 
 void AD2OSC(){
-  float adc0, adc1, adc2, adc3;
-  adc0 = ((ads.readADC_SingleEnded(0) * ADresolution)/1000);  // GSR
-  adc1 = ((ads.readADC_SingleEnded(1) * ADresolution)/1000);  //Heart Rate
-  adc2 = ((ads.readADC_SingleEnded(2) * ADresolution)/1000);
-  adc3 = ((ads.readADC_SingleEnded(3) * ADresolution)/1000);
+  #ifdef EXTERNAL_ADC
+    int adc0, adc1;
+    adc0 = normalize(0, 16384, ads.readADC_SingleEnded(0));
+    adc1 = normalize(0, 16384, ads.readADC_SingleEnded(1));
+  #endif
+
+  #ifndef EXTERNAL_ADC
+    int adc0;
+    adc0 = normalize(0, 1024, analogRead(A0));
+    // adc0 = analogRead(A0);
+  #endif
 
   char volt_ch1[8];
   volt_ch1[0] = {0}; //reset buffor
   strcat(volt_ch1, oscMsgHeader);
-  strcat(volt_ch1, "/gsr"); //build OSC message with unit ID
   OSCMessage voltage1(volt_ch1);
+  #ifdef EXTERNAL_ADC
+    voltage1.add(adc1);
+  #endif
   voltage1.add(adc0);
   Udp.beginPacket(remoteIP, destPort);
   voltage1.send(Udp);
   Udp.endPacket();
   voltage1.empty();
+}
 
-  char volt_ch2[8];
-  volt_ch2[0] = {0}; //reset buffor
-  strcat(volt_ch2, oscMsgHeader);
-  strcat(volt_ch2, "/hr"); //build OSC message with unit ID
-  OSCMessage voltage2(volt_ch2);
-  voltage2.add(adc1);
-  Udp.beginPacket(remoteIP, destPort);
-  voltage2.send(Udp);
-  Udp.endPacket();
-  voltage2.empty();
+unsigned long normalize(unsigned long value_min, unsigned long value_max, unsigned long value) {
+    // ghetto callibration
+    // think of the sliding_min and sliding_max as two walls that are always closing in creating
+    // and more and more narrow hallway for the incoming value to fit in. when the value breaches
+    // those walls they are expanded by `step`. when the value is below those walls they are
+    // further enclosed by step
+
+    if (sliding_min < 0) sliding_min = value_min;
+    else if (value < sliding_min) sliding_min = value;
+    else if (value > sliding_min && sliding_min+step < sliding_max) sliding_min += step;
+
+    if (sliding_max < 0) sliding_max = value_max;
+    else if (value > sliding_max) sliding_max = value;
+    else if (value < sliding_max && sliding_max-step > sliding_min) sliding_max -= step;
+
+    unsigned long output;
+    // this calculation assumes we want a return value between 0 and 1000. We scale using value so as to avoid any need for float point
+    output = (value-sliding_min)*1000/(sliding_max-sliding_min);
+
+    // if you do not want to use the sliding window calibration method then uncomment the following
+    //output = (value*1000)/(value_max-value_min);
+
+    return output;
 }
 
 void OSCMsgReceive(){
@@ -253,7 +279,6 @@ void led(OSCMessage &msg, int addrOffset) {
 
   leds[0] = CRGB(R, G, B);
   FastLED.show();
-  // FastLED.showColor(CHSV(H, S, V));
 }
 
 void sendReport(){
@@ -272,8 +297,12 @@ void sendReport(){
   #ifndef PRODUCTION
     Serial.print(rssi_ch); Serial.print(" "); Serial.println(RSSI);
   #endif
+  Udp.beginPacket(remoteIP, destPort);
+  rssi.send(Udp);
+  Udp.endPacket();
+  rssi.empty();
 
-  //time
+  // running time
   char time_ch[32];
   time_ch[0] = {0};
   unsigned int runningTime = millis()/1000;
@@ -284,6 +313,10 @@ void sendReport(){
   #ifndef PRODUCTION
     Serial.print(time_ch); Serial.print(" "); Serial.println(runningTime);
   #endif
+  Udp.beginPacket(remoteIP, destPort);
+  rtime.send(Udp);
+  Udp.endPacket();
+  rtime.empty();
 
   //version
   char ver_ch[16];
@@ -296,6 +329,10 @@ void sendReport(){
   #ifndef PRODUCTION
     Serial.print(ver_ch); Serial.print(" "); Serial.println(Ver);
   #endif
+  Udp.beginPacket(remoteIP, destPort);
+  ver.send(Udp);
+  Udp.endPacket();
+  ver.empty();
 
   //channel
   char ch_ch[16];
@@ -307,26 +344,25 @@ void sendReport(){
   #ifndef PRODUCTION
     Serial.print(ch_ch); Serial.print(" "); Serial.println(WiFi.channel());
   #endif
-
-  Udp.beginPacket(remoteIP, destPort);
-  rssi.send(Udp);
-  Udp.endPacket();
-  rssi.empty();
-
-  Udp.beginPacket(remoteIP, destPort);
-  rtime.send(Udp);
-  Udp.endPacket();
-  rtime.empty();
-
-  Udp.beginPacket(remoteIP, destPort);
-  ver.send(Udp);
-  Udp.endPacket();
-  ver.empty();
-
   Udp.beginPacket(remoteIP, destPort);
   channel.send(Udp);
   Udp.endPacket();
   channel.empty();
+
+  #ifdef EXTERNAL_ADC
+    float adc2;
+    adc2 = ((ads.readADC_SingleEnded(2) * ADresolution)/1000);
+    char volt_ch3[8];
+    volt_ch3[0] = {0}; //reset buffor
+    strcat(volt_ch3, oscMsgHeader);
+    strcat(volt_ch3, "/lipo"); //build OSC message with unit ID
+    OSCMessage voltage3(volt_ch3);
+    voltage3.add(adc2);
+    Udp.beginPacket(remoteIP, destPort);
+    voltage3.send(Udp);
+    Udp.endPacket();
+    voltage3.empty();
+  #endif
 
   #ifndef PRODUCTION
     Serial.println("--- end of OSC ---");
