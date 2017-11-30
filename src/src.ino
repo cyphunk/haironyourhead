@@ -1,11 +1,12 @@
 //******************************************************************************
-#define FIRMWARE_VERSION 1.6  //MAJOR.MINOR more info on: http://semver.org
+#define FIRMWARE_VERSION 1.7  //MAJOR.MINOR more info on: http://semver.org
 #define PROJECT "health_monitor"
 #define SERIAL_SPEED 9600       // 9600 for BLE friend
 #define HOSTNAME "monitor"
-#define UNIT_ID 112             //last octet of IP
+#define UNIT_ID 211             //last octet of IP
 //#define EXTERNAL_ADC         // uncomment for version with external ADc
 //#define PRODUCTION true       //uncoment to turn the serial debuging off
+//#define NEOPIXEL              //if not defined, build in LED will be used
 //******************************************************************************
 
 extern "C"{
@@ -20,7 +21,6 @@ extern "C"{
 #include <WiFiUdp.h>
 #include <ESP8266mDNS.h>
 #include <ArduinoOTA.h>
-
 //   |--------------|-------|---------------|--|--|--|--|--|
 //   ^              ^       ^               ^     ^
 //   Sketch    OTA update   File system   EEPROM  WiFi config (SDK)
@@ -35,17 +35,22 @@ OSCErrorCode error;
 // OSC IP and port settings in credentials.h
 
 #define REPORT_INTERVAL 1000 * 3      //OSC report inerval 3 secs
-#define MEASURMENT_INTERVAL 5       //AD measurment inerval
+#define MEASURMENT_INTERVAL 10       //AD measurment inerval
 unsigned long previousMillisReport = 0;
 unsigned long previousMillisMeasurment = 0;
 unsigned long currentMillisReport, currentMillisMeasurment, runningTime;
 
 char oscMsgHeader[8];    //OSC message header updated with unit ID
 
-#include <FastLED.h>
-#define NUM_LEDS 1
-#define DATA_PIN 14 //D5    pin for neopixel
-CRGB leds[NUM_LEDS];
+#ifdef NEOPIXEL
+  #include <FastLED.h>
+  #define NUM_LEDS 1
+  #define DATA_PIN 14 //D5    pin for neopixel
+  CRGB leds[NUM_LEDS];
+#endif
+#ifndef NEOPIXEL
+  #define BUILD_IN_LED 02
+#endif
 
 #ifdef EXTERNAL_ADC
   #include <Wire.h>
@@ -58,7 +63,6 @@ CRGB leds[NUM_LEDS];
 long sliding_min = -1;
 long sliding_max = -1;
 unsigned int step = 1;
-
 
 void setup()
 {
@@ -87,9 +91,14 @@ sprintf(oscMsgHeader, "/%i", UNIT_ID);   // for sending OSC messages: /xxx/messa
   Serial.println();
 #endif
 
-// initialize neopixel
-FastLED.addLeds<WS2812, DATA_PIN, GRB>(leds, NUM_LEDS);
-FastLED.showColor(CHSV(HUE_GREEN, 255, 100));
+#ifdef NEOPIXEL     // initialize neopixel
+  FastLED.addLeds<WS2812, DATA_PIN, GRB>(leds, NUM_LEDS);
+  FastLED.showColor(CHSV(HUE_GREEN, 255, 100));
+#endif
+
+#ifndef NEOPIXEL   // if not neopixel use build in led
+  pinMode(BUILD_IN_LED, OUTPUT);
+#endif
 
 //---------------------------- WiFi --------------------------------------------
 WiFi.mode(WIFI_STA);  // https://www.arduino.cc/en/Reference/WiFiConfig
@@ -115,7 +124,7 @@ char id[4]; id[0] = {0};
 strcat(buf, HOSTNAME);
 sprintf(id, "%i", UNIT_ID);
 strcat(buf,id);
-ArduinoOTA.setHostname(buf);
+ArduinoOTA.setHostname(buf);    // something like: monitor211, to ping or program use monitor211.local
 
 #ifndef PRODUCTION // Not in PRODUCTION
   Serial.print("Hostname: "); Serial.println(buf);
@@ -131,17 +140,23 @@ ArduinoOTA.onEnd([]() {
 #ifndef PRODUCTION // Not in PRODUCTION
   Serial.println("\nEnd");
 #endif
-FastLED.showColor(CHSV(HUE_ORANGE, 255, 200));
+#ifdef NEOPIXEL
+  FastLED.showColor(CHSV(HUE_ORANGE, 255, 200));
+#endif
 
 });
 ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
 #ifndef PRODUCTION // Not in PRODUCTION
   Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
 #endif
-FastLED.showColor(CHSV(HUE_BLUE, 255, 100));
-delay(1);
-FastLED.showColor(CHSV(HUE_BLUE, 255, 0));
-
+#ifdef NEOPIXEL   //ota uploading indicator
+  FastLED.showColor(CHSV(HUE_BLUE, 255, 100));
+  delay(1);
+  FastLED.showColor(CHSV(HUE_BLUE, 255, 0));
+#endif
+#ifndef NEOPIXEL
+  digitalWrite(BUILD_IN_LED, LOW); delay(1); digitalWrite(BUILD_IN_LED, HIGH);                                                                  //TODO add build in LED feedback
+#endif
 });
 ArduinoOTA.onError([](ota_error_t error) {
 #ifndef PRODUCTION // Not in PRODUCTION
@@ -160,6 +175,10 @@ Udp.begin(localPort);
   Serial.print("IP address: "); Serial.println(WiFi.localIP());
 #endif
 
+#ifndef NEOPIXEL    //turn led on if connected
+digitalWrite(BUILD_IN_LED, LOW);
+#endif
+
 //-------------------------- External ADc --------------------------------------
 #ifdef EXTERNAL_ADC
   #ifndef PRODUCTION // Not in PRODUCTION
@@ -171,9 +190,11 @@ Udp.begin(localPort);
   ads.begin();
 #endif
 
+#ifdef NEOPIXEL
 FastLED.showColor(CHSV(HUE_GREEN, 255, 100));
 delay(500);
 FastLED.showColor(CHSV(HUE_GREEN, 255, 0));
+#endif
 }
 
 void loop() {
@@ -245,6 +266,29 @@ unsigned long normalize(unsigned long value_min, unsigned long value_max, unsign
     return output;
 }
 
+void led(OSCMessage &msg, int addrOffset) {
+  int R = roundf(msg.getFloat(0) * 255);
+  int G = roundf(msg.getFloat(1) * 255);
+  int B = roundf(msg.getFloat(2) * 255);
+
+  #ifndef PRODUCTION
+    Serial.print("RGB received:");
+    Serial.print(" "); Serial.print(R);
+    Serial.print(" "); Serial.print(G);
+    Serial.print(" "); Serial.println(B);
+  #endif
+
+  #ifdef NEOPIXEL
+    leds[0] = CRGB(R, G, B);
+    FastLED.show();
+  #endif
+
+  #ifndef NEOPIXEL
+    if (R > 0) digitalWrite(BUILD_IN_LED, LOW);
+    else digitalWrite(BUILD_IN_LED, HIGH);
+  #endif
+}
+
 void OSCMsgReceive(){
   OSCMessage msgIN;
   int size;
@@ -263,22 +307,6 @@ void OSCMsgReceive(){
 
     }
   }
-}
-
-void led(OSCMessage &msg, int addrOffset) {
-  int R = roundf(msg.getFloat(0) * 255);
-  int G = roundf(msg.getFloat(1) * 255);
-  int B = roundf(msg.getFloat(2) * 255);
-
-  // #ifndef PRODUCTION
-  //   Serial.print("RGB received:");
-  //   Serial.print(" "); Serial.print(R);
-  //   Serial.print(" "); Serial.print(G);
-  //   Serial.print(" "); Serial.println(B);
-  // #endif
-
-  leds[0] = CRGB(R, G, B);
-  FastLED.show();
 }
 
 void sendReport(){
