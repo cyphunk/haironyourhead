@@ -1,9 +1,8 @@
 //******************************************************************************
-#define FIRMWARE_VERSION 1.7  //MAJOR.MINOR more info on: http://semver.org
+#define FIRMWARE_VERSION 1.8    //MAJOR.MINOR more info on: http://semver.org
 #define PROJECT "health_monitor"
 #define SERIAL_SPEED 9600       // 9600 for BLE friend
 #define HOSTNAME "monitor"
-#define UNIT_ID 211             //last octet of IP
 //#define EXTERNAL_ADC         // uncomment for version with external ADc
 //#define PRODUCTION true       //uncoment to turn the serial debuging off
 //#define NEOPIXEL              //if not defined, build in LED will be used
@@ -64,11 +63,10 @@ long sliding_min = -1;
 long sliding_max = -1;
 unsigned int step = 1;
 
+int unit_id;
+
 void setup()
 {
-// generate OSC header /xxx based on UNIT_ID
-sprintf(oscMsgHeader, "/%i", UNIT_ID);   // for sending OSC messages: /xxx/message value
-
 #ifndef PRODUCTION
   Serial.begin(SERIAL_SPEED);
   // compiling info
@@ -98,15 +96,17 @@ sprintf(oscMsgHeader, "/%i", UNIT_ID);   // for sending OSC messages: /xxx/messa
 
 #ifndef NEOPIXEL   // if not neopixel use build in led
   pinMode(BUILD_IN_LED, OUTPUT);
+  digitalWrite(BUILD_IN_LED,HIGH); //off by default
 #endif
 
 //---------------------------- WiFi --------------------------------------------
 WiFi.mode(WIFI_STA);  // https://www.arduino.cc/en/Reference/WiFiConfig
-WiFi.config(ip, gateway, subnet);
+// WiFi.config(ip, gateway, subnet);  //uncomment for fixed ip address, defined in credentials.h file
 
 #ifndef PRODUCTION // Not in PRODUCTION
+  Serial.print("unit MAC address: "); Serial.println(WiFi.macAddress());
   Serial.print("Connecting to ");
-  Serial.println(ssid);
+  Serial.print(ssid); Serial.println(" with DHCP");
 #endif
 WiFi.begin(ssid, password);
 
@@ -117,12 +117,22 @@ while (WiFi.waitForConnectResult() != WL_CONNECTED) {
   delay(5000);
   ESP.restart();
 }
+delay(500);
+#ifndef PRODUCTION // Not in PRODUCTION
+  Serial.print("IP address: "); Serial.println(WiFi.localIP());
+#endif
+
+unit_id = WiFi.localIP()[3];
+Serial.print("Unit ID (last octet): "); Serial.println(unit_id);
+
+// generate OSC header /xxx based on unit_id
+sprintf(oscMsgHeader, "/%i", unit_id);   // for sending OSC messages: /xxx/message value
 
 // --------------------------- OTA ---------------------------------------------
 char buf[30]; buf[0] = {0};                                                     //TODO tidy up
 char id[4]; id[0] = {0};
 strcat(buf, HOSTNAME);
-sprintf(id, "%i", UNIT_ID);
+sprintf(id, "%i", unit_id);
 strcat(buf,id);
 ArduinoOTA.setHostname(buf);    // something like: monitor211, to ping or program use monitor211.local
 
@@ -170,10 +180,6 @@ ArduinoOTA.onError([](ota_error_t error) {
 });
 ArduinoOTA.begin();
 Udp.begin(localPort);
-
-#ifndef PRODUCTION // Not in PRODUCTION
-  Serial.print("IP address: "); Serial.println(WiFi.localIP());
-#endif
 
 #ifndef NEOPIXEL    //turn led on if connected
 digitalWrite(BUILD_IN_LED, LOW);
