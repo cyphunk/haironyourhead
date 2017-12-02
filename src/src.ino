@@ -3,7 +3,7 @@
 #define PROJECT "health_monitor"
 #define SERIAL_SPEED 9600       // 9600 for BLE friend
 #define HOSTNAME "monitor"
-//#define EXTERNAL_ADC         // uncomment for version with external ADc
+//#define GSR         // uncomment for version with additional GSR (HR stays on ESPs AD)
 //#define PRODUCTION true       //uncoment to turn the serial debuging off
 //#define NEOPIXEL              //if not defined, build in LED will be used
 //******************************************************************************
@@ -51,12 +51,15 @@ char oscMsgHeader[8];    //OSC message header updated with unit ID
   #define BUILD_IN_LED 02
 #endif
 
-#ifdef EXTERNAL_ADC
+#ifdef GSR
   #include <Wire.h>
   #include <Adafruit_ADS1015.h>
   Adafruit_ADS1115 ads;  /* Use this for the 16-bit version */
   float ADresolution = 0;
 #endif
+
+char osc_header_id_hr[8];   //OSC message headers
+char osc_header_id_gsr[8];
 
 // normalize function variables
 long sliding_min = -1;
@@ -125,8 +128,14 @@ delay(500);
 unit_id = WiFi.localIP()[3];
 Serial.print("Unit ID (last octet): "); Serial.println(unit_id);
 
-// generate OSC header /xxx based on unit_id
-sprintf(oscMsgHeader, "/%i", unit_id);   // for sending OSC messages: /xxx/message value
+// generate OSC header /xxx/hr, /xxx/gsr based on unit_id
+sprintf(oscMsgHeader, "/%i", unit_id);
+osc_header_id_hr[0] = {0}; //reset buffor
+strcat(osc_header_id_hr, oscMsgHeader);
+strcat(osc_header_id_hr, "/hr");
+osc_header_id_gsr[0] = {0}; //reset buffor
+strcat(osc_header_id_gsr, oscMsgHeader);
+strcat(osc_header_id_gsr, "/gsr");
 
 // --------------------------- OTA ---------------------------------------------
 char buf[30]; buf[0] = {0};                                                     //TODO tidy up
@@ -186,7 +195,7 @@ digitalWrite(BUILD_IN_LED, LOW);
 #endif
 
 //-------------------------- External ADc --------------------------------------
-#ifdef EXTERNAL_ADC
+#ifdef GSR
   #ifndef PRODUCTION // Not in PRODUCTION
     Serial.println("Getting single-ended readings from AIN0..3");
     Serial.println("ADC Range: +/- 6.144V (1 bit = 0.1875mV/ADS1115)");
@@ -221,30 +230,25 @@ void loop() {
 }
 
 void AD2OSC(){
-  #ifdef EXTERNAL_ADC
-    int adc0, adc1;
-    adc0 = normalize(0, 16384, ads.readADC_SingleEnded(0));
-    adc1 = normalize(0, 16384, ads.readADC_SingleEnded(1));
-  #endif
-
-  #ifndef EXTERNAL_ADC
-    int adc0;
-    adc0 = normalize(0, 1024, analogRead(A0));
-    // adc0 = analogRead(A0);
-  #endif
-
-  char volt_ch1[8];
-  volt_ch1[0] = {0}; //reset buffor
-  strcat(volt_ch1, oscMsgHeader);
-  OSCMessage voltage1(volt_ch1);
-  #ifdef EXTERNAL_ADC
-    voltage1.add(adc1);
-  #endif
-  voltage1.add(adc0);
+  int adc_int;       //internal ESP ADC
+  adc_int = normalize(0, 1024, analogRead(A0));
+  OSCMessage voltage_hr(osc_header_id_hr);
+  voltage_hr.add(adc_int);
   Udp.beginPacket(remoteIP, destPort);
-  voltage1.send(Udp);
+  voltage_hr.send(Udp);
   Udp.endPacket();
-  voltage1.empty();
+  voltage_hr.empty();
+
+  #ifdef GSR
+  int adc_ext;    //external ADC ADS1115
+  adc_ext = normalize(0, 16384, ads.readADC_SingleEnded(0));                    //TODO calculate resolution for ADS 1015
+  OSCMessage voltage_gsr(osc_header_id_gsr);
+  voltage_gsr.add(adc_ext);
+  Udp.beginPacket(remoteIP, destPort);
+  voltage_gsr.send(Udp);
+  Udp.endPacket();
+  voltage_gsr.empty();
+  #endif
 }
 
 unsigned long normalize(unsigned long value_min, unsigned long value_max, unsigned long value) {
@@ -383,7 +387,7 @@ void sendReport(){
   Udp.endPacket();
   channel.empty();
 
-  #ifdef EXTERNAL_ADC
+  #ifdef GSR
     float adc2;
     adc2 = ((ads.readADC_SingleEnded(2) * ADresolution)/1000);
     char volt_ch3[8];
