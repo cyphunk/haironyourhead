@@ -288,11 +288,11 @@ void led(OSCMessage &msg, int addrOffset) {
 
   #ifdef SERIAL_DEBUG
     Serial.print("OSC received:");
-    Serial.print(" "); Serial.print(led_on_off);
+    Serial.print(" "); Serial.println(led_on_off);
   #endif
 
   #ifdef ONBOARDLED
-    if (led_on_off == 0) digitalWrite(BUILD_IN_LED, LOW);
+    if (led_on_off == 0) digitalWrite(BUILD_IN_LED, HIGH);
     if (led_on_off == 1) digitalWrite(BUILD_IN_LED, LOW);
   #endif
 }
