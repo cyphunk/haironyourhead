@@ -1,7 +1,8 @@
 //******************************************************************************
-#define FIRMWARE_VERSION 1.93   //MAJOR.MINOR more info on: http://semver.org
+#define FIRMWARE_VERSION 1.95   //MAJOR.MINOR more info on: http://semver.org
 #define SERIAL_SPEED 9600       // 9600 for BLE friend
 #define SERIAL_DEBUG true       //coment to turn the serial debuging off
+//#define SERIAL_PLOTTER true     // for isolating Arduino IDE serial ploter
 #define HOSTNAME "monitor"      // something like: monitor211, to ping or upload firmware over OTA use monitor211.local
 //#define GSR                   // uncomment for version with additional GSR (HR stays on ESPs ADC)
 //#define NEOPIXEL
@@ -69,7 +70,8 @@ void setup()
 #ifdef SERIAL_DEBUG
   Serial.begin(SERIAL_SPEED);
   Serial.println("\r\n--------------------------------");        // compiling info
-  Serial.print("HR&GSR Ver: "); Serial.print(FIRMWARE_VERSION); Serial.println(" by Grzegorz Zajac and Nathan Andrew Fain");
+  Serial.print("HR&GSR Ver: "); Serial.println(FIRMWARE_VERSION);
+  Serial.println("by Grzegorz Zajac and Nathan Andrew Fain");
   Serial.println("Compiled: " __DATE__ ", " __TIME__ ", " __VERSION__);
   Serial.println("---------------------------------");
   Serial.println("ESP Info: ");
@@ -111,7 +113,7 @@ while (WiFi.waitForConnectResult() != WL_CONNECTED) {
 #ifdef SERIAL_DEBUG
   Serial.println("Connection Failed! Rebooting...");
 #endif
-  delay(5000);
+  delay(8000);
   ESP.restart();
 }
 
@@ -202,10 +204,10 @@ delay(500);
 FastLED.showColor(CHSV(HUE_GREEN, 255, 0));
 #endif
 
-Serial.println("end of setup");
 #ifdef ONBOARDLED    //turn led on if connected
 digitalWrite(BUILD_IN_LED, LOW);
 #endif
+
 }
 
 void loop() {
@@ -229,10 +231,12 @@ void AD2OSC(){
   int adc_int;       //internal ESP ADC
   adc_int = normalize(0, 1024, analogRead(A0));
 
-  #ifdef SERIAL_DEBUG   //for Arduino IDE serial ploter
+  #ifdef SERIAL_DEBUG
+    #ifdef SERIAL_PLOTTER  //for Arduino IDE serial ploter
     Serial.print(adc_int); Serial.print(",");
     Serial.print(sliding_min); Serial.print(",");
     Serial.println(sliding_max);
+    #endif
   #endif
 
   OSCMessage voltage_hr(osc_header_hr);
@@ -280,23 +284,16 @@ unsigned long normalize(unsigned long value_min, unsigned long value_max, unsign
 }
 
 void led(OSCMessage &msg, int addrOffset) {
-  int led_on_off = roundf(msg.getInt(0));
-  // int G = roundf(msg.getFloat(1) * 255);
-  // int B = roundf(msg.getFloat(2) * 255);
+  int led_on_off = (msg.getInt(0));
 
   #ifdef SERIAL_DEBUG
     Serial.print("OSC received:");
     Serial.print(" "); Serial.print(led_on_off);
   #endif
 
-  #ifdef NEOPIXEL
-    leds[0] = CRGB(R, G, B);
-    FastLED.show();
-  #endif
-
   #ifdef ONBOARDLED
     if (led_on_off == 0) digitalWrite(BUILD_IN_LED, LOW);
-    else digitalWrite(BUILD_IN_LED, HIGH);
+    if (led_on_off == 1) digitalWrite(BUILD_IN_LED, LOW);
   #endif
 }
 
