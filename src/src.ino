@@ -1,11 +1,11 @@
 //******************************************************************************
 #define FIRMWARE_VERSION 2.02   //MAJOR.MINOR more info on: http://semver.org
-#define SERIAL_SPEED 9600       // 9600 for BLE friend
+#define SERIAL_SPEED 115200       // 9600 for BLE friend
 #define SERIAL_DEBUG true       //coment to turn the serial debuging off
 #define SERIAL_PLOTTER true     // for isolating Arduino IDE serial ploter
 // #define STOPWATCH               //run stopwatch to measure timing in code
 #define HOSTNAME "monitor"      // something like: monitor211, to ping or upload firmware over OTA use monitor211.local
-#define GSR                   // uncomment for version with additional GSR (HR stays on ESPs ADC)
+//#define GSR                   // uncomment for version with additional GSR (HR stays on ESPs ADC)
 //#define NEOPIXEL
 #define ONBOARDLED              //ESP build in blue led
 //******************************************************************************
@@ -33,10 +33,15 @@ WiFiUDP Udp;
 OSCErrorCode error;
 
 int report_interval = 3000;      //OSC report inerval 3 secs
-int measurment_interval = 10;       //AD measurment inerval
+int measurment_interval = 20;       //AD measurment inerval
 unsigned long previousMillisReport = 0;
 unsigned long previousMillisMeasurment = 0;
 unsigned long currentMillisReport, currentMillisMeasurment, runningTime;
+#if SERIAL_PLOTTER == true
+boolean serialPlotterEnable = true;
+#else
+boolean serialPlotterEnable = false;
+#endif
 
 #ifdef STOPWATCH
  unsigned long timingMillisReference, timingMillisRuning;
@@ -312,13 +317,11 @@ void AD2OSC(){
     timingMillisReference = millis(); //reset stopwatch
   #endif
 
-  #ifdef SERIAL_DEBUG
-    #ifdef SERIAL_PLOTTER  //for Arduino IDE serial ploter
-    Serial.print(adc_int); Serial.print(",");
-    Serial.print(sliding_min); Serial.print(",");
-    Serial.println(sliding_max);
-    #endif
-  #endif
+    if (serialPlotterEnable && Serial) {
+        Serial.print(adc_int); Serial.print(",");
+        Serial.print(sliding_min); Serial.print(",");
+        Serial.println(sliding_max);
+    }
 
   #ifdef STOPWATCH
     timingMillisRuning = millis() - timingMillisReference;
@@ -339,7 +342,8 @@ void AD2OSC(){
 
   #ifdef GSR
     int adc_ext;    //external ADC ADS1115
-    adc_ext = normalize(0, 16384, ads.readADC_SingleEnded(0));                    //TODO calculate resolution for ADS 1015
+    //adc_ext = normalize(0, 16384, ads.readADC_SingleEnded(0));                    //TODO calculate resolution for ADS 1015
+    adc_ext = ads.readADC_SingleEnded(0);                    //TODO calculate resolution for ADS 1015
     OSCMessage voltage_gsr(osc_header_gsr);
     voltage_gsr.add(adc_ext);
     Udp.beginPacket(remoteIP, destPort);
@@ -363,9 +367,12 @@ unsigned long normalize(unsigned long value_min, unsigned long value_max, unsign
     // those walls they are expanded by `step`. when the value is below those walls they are
     // further enclosed by step
 
-    if (sliding_min < 0) sliding_min = value_min;
-    else if (value < sliding_min) sliding_min = value;
-    else if (value > sliding_min && sliding_min+step < sliding_max) sliding_min += step;
+    // first run (when sliding_min == -1):
+    if (sliding_min < 0) sliding_min = value_min; 
+    // value is lower than expected, make floor this value:
+    else if (value < sliding_min) sliding_min = value; 
+    // value is above floor, slowly move floor up:
+    else if (value > sliding_min && sliding_min+step < sliding_max) sliding_min += step; 
 
     if (sliding_max < 0) sliding_max = value_max;
     else if (value > sliding_max) sliding_max = value;
@@ -412,6 +419,19 @@ void osc_destination_fn(OSCMessage &msg){
   #endif
 }
 
+void serial_plot_fn(OSCMessage &msg){
+  int onoff = msg.getInt(0);
+  if (onoff != 1) {
+    // == 0  disable Serial port and exit
+    serialPlotterEnable = false;
+    Serial.end();
+    return;
+  }
+  if (!Serial)
+    Serial.begin(SERIAL_SPEED);
+  serialPlotterEnable = true;
+}
+
 void OSCMsgReceive(){
   OSCMessage msgIN;
   int size;
@@ -423,6 +443,7 @@ void OSCMsgReceive(){
       msgIN.dispatch("/interval", measurment_interval_fn);
       msgIN.dispatch("/report", report_interval_fn);
       msgIN.dispatch("/destination", osc_destination_fn);
+      msgIN.dispatch("/serialplot", serial_plot_fn);
     } else {
       error = msgIN.getError();
       #ifdef SERIAL_DEBUG
