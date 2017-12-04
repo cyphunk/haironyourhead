@@ -1,10 +1,11 @@
 //******************************************************************************
-#define FIRMWARE_VERSION 1.98   //MAJOR.MINOR more info on: http://semver.org
+#define FIRMWARE_VERSION 2.02   //MAJOR.MINOR more info on: http://semver.org
 #define SERIAL_SPEED 9600       // 9600 for BLE friend
 #define SERIAL_DEBUG true       //coment to turn the serial debuging off
 #define SERIAL_PLOTTER true     // for isolating Arduino IDE serial ploter
+// #define STOPWATCH               //run stopwatch to measure timing in code
 #define HOSTNAME "monitor"      // something like: monitor211, to ping or upload firmware over OTA use monitor211.local
-//#define GSR                   // uncomment for version with additional GSR (HR stays on ESPs ADC)
+#define GSR                   // uncomment for version with additional GSR (HR stays on ESPs ADC)
 //#define NEOPIXEL
 #define ONBOARDLED              //ESP build in blue led
 //******************************************************************************
@@ -37,6 +38,10 @@ unsigned long previousMillisReport = 0;
 unsigned long previousMillisMeasurment = 0;
 unsigned long currentMillisReport, currentMillisMeasurment, runningTime;
 
+#ifdef STOPWATCH
+ unsigned long timingMillisReference, timingMillisRuning;
+#endif
+
 #ifdef NEOPIXEL
   #include <FastLED.h>
   #define NUM_LEDS 1
@@ -63,13 +68,24 @@ unsigned int step = 1;
 char osc_header_report[8];
 char osc_header_hr[8];
 #ifdef GSR
-  char osc_header_gsr[8];
+  char osc_header_gsr[10];
 #endif
 
 void setup()
 {
 #ifdef SERIAL_DEBUG
   Serial.begin(SERIAL_SPEED);
+#endif
+
+#ifdef STOPWATCH
+  #ifdef SERIAL_DEBUG
+    Serial.println(); Serial.println();
+    Serial.print("\r\n- entering setup, reseting stopwatch");
+  #endif
+  timingMillisReference = millis(); //reset stopwatch
+#endif
+
+#ifdef SERIAL_DEBUG
   Serial.println("\r\n--------------------------------");        // compiling info
   Serial.print("HR&GSR Ver: "); Serial.println(FIRMWARE_VERSION);
   Serial.println("by Grzegorz Zajac and Nathan Andrew Fain");
@@ -128,7 +144,7 @@ osc_header_hr[0] = {0}; //reset buffor, start with a null string
 snprintf(osc_header_hr, 8, "/%d/hr", WiFi.localIP()[3]);
 #ifdef GSR
   osc_header_gsr[0] = {0}; //reset buffor, start with a null string
-  snprintf(osc_header_gsr, 8, "/%d/gsr", WiFi.localIP()[3]);
+  snprintf(osc_header_gsr, 10, "/%d/gsr", WiFi.localIP()[3]);
 #endif
 
 #ifdef SERIAL_DEBUG
@@ -209,11 +225,42 @@ FastLED.showColor(CHSV(HUE_GREEN, 255, 0));
 digitalWrite(BUILD_IN_LED, LOW);
 #endif
 
+#ifdef STOPWATCH
+  timingMillisRuning = millis() - timingMillisReference;
+  #ifdef SERIAL_DEBUG
+    Serial.print("- setup time: "); Serial.println(timingMillisRuning);
+  #endif
+#endif
 }
 
 void loop() {
+  #ifdef STOPWATCH
+    #ifdef SERIAL_DEBUG
+      Serial.println("\r\n- starting loop");
+    #endif
+    timingMillisReference = millis(); //reset stopwatch
+  #endif
+
   ArduinoOTA.handle();
+
+  #ifdef STOPWATCH
+    timingMillisRuning = millis() - timingMillisReference;
+    #ifdef SERIAL_DEBUG
+      Serial.print("  OTA fn time: "); Serial.println(timingMillisRuning);
+    #endif
+  #endif
+  #ifdef STOPWATCH
+    timingMillisReference = millis(); //reset stopwatch
+  #endif
+
   OSCMsgReceive();
+
+  #ifdef STOPWATCH
+    timingMillisRuning = millis() - timingMillisReference;
+    #ifdef SERIAL_DEBUG
+      Serial.print("  OSC receive fn time: "); Serial.println(timingMillisRuning);
+    #endif
+  #endif
 
   currentMillisMeasurment = millis();
   if (currentMillisMeasurment - previousMillisMeasurment >= (measurment_interval)) {
@@ -231,8 +278,39 @@ void loop() {
 }
 
 void AD2OSC(){
+  #ifdef STOPWATCH
+    #ifdef SERIAL_DEBUG
+      Serial.println("\r\n   starting AD2OSC");
+    #endif
+    timingMillisReference = millis(); //reset stopwatch
+  #endif
+
   int adc_int;       //internal ESP ADC
-  adc_int = normalize(0, 1024, analogRead(A0));
+  adc_int = analogRead(A0);
+
+  #ifdef STOPWATCH
+    timingMillisRuning = millis() - timingMillisReference;
+    #ifdef SERIAL_DEBUG
+      Serial.print("   AD sampling time: "); Serial.println(timingMillisRuning);
+    #endif
+  #endif
+
+  #ifdef STOPWATCH
+    timingMillisReference = millis(); //reset stopwatch
+  #endif
+
+  adc_int = normalize(0, 1024, adc_int);
+
+  #ifdef STOPWATCH
+    timingMillisRuning = millis() - timingMillisReference;
+    #ifdef SERIAL_DEBUG
+      Serial.print("   normalizing time: "); Serial.println(timingMillisRuning);
+    #endif
+  #endif
+
+  #ifdef STOPWATCH
+    timingMillisReference = millis(); //reset stopwatch
+  #endif
 
   #ifdef SERIAL_DEBUG
     #ifdef SERIAL_PLOTTER  //for Arduino IDE serial ploter
@@ -242,6 +320,16 @@ void AD2OSC(){
     #endif
   #endif
 
+  #ifdef STOPWATCH
+    timingMillisRuning = millis() - timingMillisReference;
+    #ifdef SERIAL_DEBUG
+      Serial.print("   serial2ploter time: "); Serial.println(timingMillisRuning);
+    #endif
+  #endif
+
+  #ifdef STOPWATCH
+    timingMillisReference = millis(); //reset stopwatch
+  #endif
   OSCMessage voltage_hr(osc_header_hr);
   voltage_hr.add(adc_int);
   Udp.beginPacket(remoteIP, destPort);
@@ -258,6 +346,13 @@ void AD2OSC(){
     voltage_gsr.send(Udp);
     Udp.endPacket();
     voltage_gsr.empty();
+  #endif
+
+  #ifdef STOPWATCH
+    timingMillisRuning = millis() - timingMillisReference;
+    #ifdef SERIAL_DEBUG
+      Serial.print("   osc send time: "); Serial.println(timingMillisRuning);
+    #endif
   #endif
 }
 
@@ -340,6 +435,12 @@ void OSCMsgReceive(){
 }
 
 void sendReport(){
+  #ifdef STOPWATCH
+    #ifdef SERIAL_DEBUG
+      Serial.println("\r\n   starting report fn");
+    #endif
+    timingMillisReference = millis(); //reset stopwatch
+  #endif
   //rssi
   char rssi_ch[32];
   rssi_ch[0] = {0};
@@ -393,7 +494,7 @@ void sendReport(){
 
   #ifdef GSR
     float adc2;
-    adc2 = ((ads.readADC_SingleEnded(2) * ADresolution)/1000);
+    adc2 = ((ads.readADC_SingleEnded(3) * ADresolution)/1000);
     char volt_ch3[8];
     volt_ch3[0] = {0}; //reset buffor
     strcat(volt_ch3, osc_header_report);
@@ -404,5 +505,12 @@ void sendReport(){
     voltage3.send(Udp);
     Udp.endPacket();
     voltage3.empty();
+  #endif
+
+  #ifdef STOPWATCH
+    timingMillisRuning = millis() - timingMillisReference;
+    #ifdef SERIAL_DEBUG
+      Serial.print("   osc report time: "); Serial.println(timingMillisRuning);
+    #endif
   #endif
 }
