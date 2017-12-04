@@ -547,12 +547,48 @@ void sendReport(){
   interval_ch[0] = {0};
   strcat(interval_ch, osc_header_report);
   strcat(interval_ch, "/interval");
-  OSCMessage interval(led_ch);
+  OSCMessage interval(interval_ch);
   interval.add(measurment_interval);
   Udp.beginPacket(remoteIP, destPort);
   interval.send(Udp);
   Udp.endPacket();
   interval.empty();
+
+  //report interval status feedback
+  char report_ch[16];
+  report_ch[0] = {0};
+  strcat(report_ch, osc_header_report);
+  strcat(report_ch, "/report");
+  OSCMessage report(report_ch);
+  report.add(report_interval);
+  Udp.beginPacket(remoteIP, destPort);
+  report.send(Udp);
+  Udp.endPacket();
+  report.empty();
+
+  //OSC destination feedback
+  char destination_ch[16];
+  destination_ch[0] = {0};
+  strcat(destination_ch, osc_header_report);
+  strcat(destination_ch, "/destination");
+  OSCMessage destination(destination_ch);
+  destination.add(remoteIP[3]);
+  Udp.beginPacket(remoteIP, destPort);
+  destination.send(Udp);
+  Udp.endPacket();
+  destination.empty();
+
+  //OSC plotter feedback
+  char plotter_ch[16];
+  plotter_ch[0] = {0};
+  strcat(plotter_ch, osc_header_report);
+  strcat(plotter_ch, "/plotter");
+  OSCMessage plotter(plotter_ch);
+  plotter.add(serialPlotterEnable);
+  Udp.beginPacket(remoteIP, destPort);
+  plotter.send(Udp);
+  Udp.endPacket();
+  plotter.empty();
 
   #ifdef STOPWATCH
     timingMillisRuning = millis() - timingMillisReference;
