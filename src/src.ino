@@ -1,5 +1,5 @@
 //******************************************************************************
-#define FIRMWARE_VERSION 1.97   //MAJOR.MINOR more info on: http://semver.org
+#define FIRMWARE_VERSION 1.98   //MAJOR.MINOR more info on: http://semver.org
 #define SERIAL_SPEED 9600       // 9600 for BLE friend
 #define SERIAL_DEBUG true       //coment to turn the serial debuging off
 #define SERIAL_PLOTTER true     // for isolating Arduino IDE serial ploter
@@ -221,10 +221,12 @@ void loop() {
     AD2OSC();
   }
 
-  currentMillisReport = millis();
-  if (currentMillisReport - previousMillisReport >= (report_interval)) {
-    previousMillisReport = currentMillisReport;
-    sendReport();                                                               //TODO send report to diffrent port or IP, separate from server
+  if (report_interval > 0){
+    currentMillisReport = millis();
+    if (currentMillisReport - previousMillisReport >= (report_interval)) {
+      previousMillisReport = currentMillisReport;
+      sendReport();                                                               //TODO send report to diffrent port or IP, separate from server
+    }
   }
 }
 
@@ -284,7 +286,7 @@ unsigned long normalize(unsigned long value_min, unsigned long value_max, unsign
     return output;
 }
 
-void led(OSCMessage &msg) {
+void led_fn(OSCMessage &msg) {
   int led_on_off = msg.getInt(0);
 
   #ifdef ONBOARDLED
@@ -296,14 +298,14 @@ void led(OSCMessage &msg) {
 void measurment_interval_fn(OSCMessage &msg){
   measurment_interval = msg.getInt(0);
   #ifdef SERIAL_DEBUG
-    Serial.print("updated measurment interval: "); Serial.println(measurment_interval);
+    Serial.print("updated measurment interval to "); Serial.println(measurment_interval);
   #endif
 }
 
 void report_interval_fn(OSCMessage &msg){
   report_interval = msg.getInt(0);
   #ifdef SERIAL_DEBUG
-    Serial.print("updated report interval: "); Serial.println(report_interval);
+    Serial.print("updated report interval to "); Serial.println(report_interval);
   #endif
 }
 
@@ -311,7 +313,7 @@ void osc_destination_fn(OSCMessage &msg){
   int ip = msg.getInt(0);
   remoteIP[3] = ip;
   #ifdef SERIAL_DEBUG
-    Serial.print("updated destination: "); Serial.println(ip);
+    Serial.print("updated destination to "); Serial.println(ip);
   #endif
 }
 
@@ -322,7 +324,7 @@ void OSCMsgReceive(){
     while(size--)
       msgIN.fill(Udp.read());
     if(!msgIN.hasError()){
-      msgIN.dispatch("/led", led);
+      msgIN.dispatch("/led", led_fn);
       msgIN.dispatch("/interval", measurment_interval_fn);
       msgIN.dispatch("/report", report_interval_fn);
       msgIN.dispatch("/destination", osc_destination_fn);
