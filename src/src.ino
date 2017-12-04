@@ -76,6 +76,8 @@ char osc_header_hr[8];
   char osc_header_gsr[10];
 #endif
 
+bool led_status = 1; // 1 led OFF
+
 void setup()
 {
 #ifdef SERIAL_DEBUG
@@ -117,7 +119,7 @@ void setup()
 
 #ifdef ONBOARDLED
   pinMode(BUILD_IN_LED, OUTPUT);
-  digitalWrite(BUILD_IN_LED,HIGH); //off by default
+  digitalWrite(BUILD_IN_LED,led_status); //off by default
 #endif
 
 //---------------------------- WiFi --------------------------------------------
@@ -193,7 +195,7 @@ ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
   FastLED.showColor(CHSV(HUE_BLUE, 255, 0));
 #endif
 #ifdef ONBOARDLED
-  digitalWrite(BUILD_IN_LED, LOW); delay(1); digitalWrite(BUILD_IN_LED, HIGH);  //flash when uploading
+  digitalWrite(BUILD_IN_LED, !led_status); delay(1); digitalWrite(BUILD_IN_LED, led_status);  //flash when uploading
 #endif
 });
 ArduinoOTA.onError([](ota_error_t error) {
@@ -227,7 +229,8 @@ FastLED.showColor(CHSV(HUE_GREEN, 255, 0));
 #endif
 
 #ifdef ONBOARDLED    //turn led on if connected
-digitalWrite(BUILD_IN_LED, LOW);
+led_status = 0;
+digitalWrite(BUILD_IN_LED, led_status);
 #endif
 
 #ifdef STOPWATCH
@@ -368,11 +371,11 @@ unsigned long normalize(unsigned long value_min, unsigned long value_max, unsign
     // further enclosed by step
 
     // first run (when sliding_min == -1):
-    if (sliding_min < 0) sliding_min = value_min; 
+    if (sliding_min < 0) sliding_min = value_min;
     // value is lower than expected, make floor this value:
-    else if (value < sliding_min) sliding_min = value; 
+    else if (value < sliding_min) sliding_min = value;
     // value is above floor, slowly move floor up:
-    else if (value > sliding_min && sliding_min+step < sliding_max) sliding_min += step; 
+    else if (value > sliding_min && sliding_min+step < sliding_max) sliding_min += step;
 
     if (sliding_max < 0) sliding_max = value_max;
     else if (value > sliding_max) sliding_max = value;
@@ -389,11 +392,9 @@ unsigned long normalize(unsigned long value_min, unsigned long value_max, unsign
 }
 
 void led_fn(OSCMessage &msg) {
-  int led_on_off = msg.getInt(0);
-
+  led_status = msg.getInt(0);
   #ifdef ONBOARDLED
-    if (led_on_off == 0) digitalWrite(BUILD_IN_LED, HIGH);
-    if (led_on_off == 1) digitalWrite(BUILD_IN_LED, LOW);
+    digitalWrite(BUILD_IN_LED, led_status);
   #endif
 }
 
@@ -462,8 +463,9 @@ void sendReport(){
     #endif
     timingMillisReference = millis(); //reset stopwatch
   #endif
+
   //rssi
-  char rssi_ch[32];
+  char rssi_ch[32];                                                             //TODO build function for OSC sending message
   rssi_ch[0] = {0};
   int32_t RSSI = WiFi.RSSI(); //check if rssi is for current network
   strcat(rssi_ch, osc_header_report);
@@ -513,20 +515,80 @@ void sendReport(){
   Udp.endPacket();
   channel.empty();
 
-  #ifdef GSR
-    float adc2;
-    adc2 = ((ads.readADC_SingleEnded(3) * ADresolution)/1000);
-    char volt_ch3[8];
-    volt_ch3[0] = {0}; //reset buffor
-    strcat(volt_ch3, osc_header_report);
-    strcat(volt_ch3, "/lipo"); //build OSC message with unit ID
-    OSCMessage voltage3(volt_ch3);
-    voltage3.add(adc2);
-    Udp.beginPacket(remoteIP, destPort);
-    voltage3.send(Udp);
-    Udp.endPacket();
-    voltage3.empty();
-  #endif
+  // #ifdef GSR               // not connected yet
+  //   float adc2;
+  //   adc2 = ((ads.readADC_SingleEnded(3) * ADresolution)/1000);
+  //   char volt_ch3[8];
+  //   volt_ch3[0] = {0}; //reset buffor
+  //   strcat(volt_ch3, osc_header_report);
+  //   strcat(volt_ch3, "/lipo"); //build OSC message with unit ID
+  //   OSCMessage voltage3(volt_ch3);
+  //   voltage3.add(adc2);
+  //   Udp.beginPacket(remoteIP, destPort);
+  //   voltage3.send(Udp);
+  //   Udp.endPacket();
+  //   voltage3.empty();
+  // #endif
+
+  //led status feedback
+  char led_ch[16];
+  led_ch[0] = {0};
+  strcat(led_ch, osc_header_report);
+  strcat(led_ch, "/led");
+  OSCMessage led(led_ch);
+  led.add(led_status);
+  Udp.beginPacket(remoteIP, destPort);
+  led.send(Udp);
+  Udp.endPacket();
+  led.empty();
+
+  //AD measurment interval status feedback
+  char interval_ch[16];
+  interval_ch[0] = {0};
+  strcat(interval_ch, osc_header_report);
+  strcat(interval_ch, "/interval");
+  OSCMessage interval(interval_ch);
+  interval.add(measurment_interval);
+  Udp.beginPacket(remoteIP, destPort);
+  interval.send(Udp);
+  Udp.endPacket();
+  interval.empty();
+
+  //report interval status feedback
+  char report_ch[16];
+  report_ch[0] = {0};
+  strcat(report_ch, osc_header_report);
+  strcat(report_ch, "/report");
+  OSCMessage report(report_ch);
+  report.add(report_interval);
+  Udp.beginPacket(remoteIP, destPort);
+  report.send(Udp);
+  Udp.endPacket();
+  report.empty();
+
+  //OSC destination feedback
+  char destination_ch[16];
+  destination_ch[0] = {0};
+  strcat(destination_ch, osc_header_report);
+  strcat(destination_ch, "/destination");
+  OSCMessage destination(destination_ch);
+  destination.add(remoteIP[3]);
+  Udp.beginPacket(remoteIP, destPort);
+  destination.send(Udp);
+  Udp.endPacket();
+  destination.empty();
+
+  //OSC plotter feedback
+  char plotter_ch[16];
+  plotter_ch[0] = {0};
+  strcat(plotter_ch, osc_header_report);
+  strcat(plotter_ch, "/plotter");
+  OSCMessage plotter(plotter_ch);
+  plotter.add(serialPlotterEnable);
+  Udp.beginPacket(remoteIP, destPort);
+  plotter.send(Udp);
+  Udp.endPacket();
+  plotter.empty();
 
   #ifdef STOPWATCH
     timingMillisRuning = millis() - timingMillisReference;
