@@ -463,8 +463,9 @@ void sendReport(){
     #endif
     timingMillisReference = millis(); //reset stopwatch
   #endif
+
   //rssi
-  char rssi_ch[32];
+  char rssi_ch[32];                                                             //TODO build function for OSC sending message
   rssi_ch[0] = {0};
   int32_t RSSI = WiFi.RSSI(); //check if rssi is for current network
   strcat(rssi_ch, osc_header_report);
@@ -540,6 +541,18 @@ void sendReport(){
   led.send(Udp);
   Udp.endPacket();
   led.empty();
+
+  //AD measurment interval status feedback
+  char interval_ch[16];
+  interval_ch[0] = {0};
+  strcat(interval_ch, osc_header_report);
+  strcat(interval_ch, "/interval");
+  OSCMessage interval(led_ch);
+  interval.add(measurment_interval);
+  Udp.beginPacket(remoteIP, destPort);
+  interval.send(Udp);
+  Udp.endPacket();
+  interval.empty();
 
   #ifdef STOPWATCH
     timingMillisRuning = millis() - timingMillisReference;
