@@ -1,8 +1,8 @@
 //******************************************************************************
-#define FIRMWARE_VERSION 1.95   //MAJOR.MINOR more info on: http://semver.org
+#define FIRMWARE_VERSION 1.98   //MAJOR.MINOR more info on: http://semver.org
 #define SERIAL_SPEED 9600       // 9600 for BLE friend
 #define SERIAL_DEBUG true       //coment to turn the serial debuging off
-//#define SERIAL_PLOTTER true     // for isolating Arduino IDE serial ploter
+#define SERIAL_PLOTTER true     // for isolating Arduino IDE serial ploter
 #define HOSTNAME "monitor"      // something like: monitor211, to ping or upload firmware over OTA use monitor211.local
 //#define GSR                   // uncomment for version with additional GSR (HR stays on ESPs ADC)
 //#define NEOPIXEL
@@ -25,13 +25,14 @@ extern "C"{
 
 // -------------------- OSC libraries ------------------------------------------
 #include <OSCMessage.h>       // https://github.com/CNMAT/OSC.git
-// #include <OSCData.h>
+#include <OSCBundle.h>
+#include <OSCData.h>
 // OSC IP and port settings in credentials.h
 WiFiUDP Udp;
 OSCErrorCode error;
 
-#define REPORT_INTERVAL 1000 * 3      //OSC report inerval 3 secs
-#define MEASURMENT_INTERVAL 10       //AD measurment inerval
+int report_interval = 3000;      //OSC report inerval 3 secs
+int measurment_interval = 10;       //AD measurment inerval
 unsigned long previousMillisReport = 0;
 unsigned long previousMillisMeasurment = 0;
 unsigned long currentMillisReport, currentMillisMeasurment, runningTime;
@@ -215,15 +216,17 @@ void loop() {
   OSCMsgReceive();
 
   currentMillisMeasurment = millis();
-  if (currentMillisMeasurment - previousMillisMeasurment >= (MEASURMENT_INTERVAL)) {
+  if (currentMillisMeasurment - previousMillisMeasurment >= (measurment_interval)) {
     previousMillisMeasurment = currentMillisMeasurment;
     AD2OSC();
   }
 
-  currentMillisReport = millis();
-  if (currentMillisReport - previousMillisReport >= (REPORT_INTERVAL)) {
-    previousMillisReport = currentMillisReport;
-    sendReport();                                                               //TODO send report to diffrent port or IP, separate from server
+  if (report_interval > 0){
+    currentMillisReport = millis();
+    if (currentMillisReport - previousMillisReport >= (report_interval)) {
+      previousMillisReport = currentMillisReport;
+      sendReport();                                                               //TODO send report to diffrent port or IP, separate from server
+    }
   }
 }
 
@@ -283,17 +286,34 @@ unsigned long normalize(unsigned long value_min, unsigned long value_max, unsign
     return output;
 }
 
-void led(OSCMessage &msg, int addrOffset) {
-  int led_on_off = (msg.getInt(0));
-
-  #ifdef SERIAL_DEBUG
-    Serial.print("OSC received:");
-    Serial.print(" "); Serial.println(led_on_off);
-  #endif
+void led_fn(OSCMessage &msg) {
+  int led_on_off = msg.getInt(0);
 
   #ifdef ONBOARDLED
     if (led_on_off == 0) digitalWrite(BUILD_IN_LED, HIGH);
     if (led_on_off == 1) digitalWrite(BUILD_IN_LED, LOW);
+  #endif
+}
+
+void measurment_interval_fn(OSCMessage &msg){
+  measurment_interval = msg.getInt(0);
+  #ifdef SERIAL_DEBUG
+    Serial.print("updated measurment interval to "); Serial.println(measurment_interval);
+  #endif
+}
+
+void report_interval_fn(OSCMessage &msg){
+  report_interval = msg.getInt(0);
+  #ifdef SERIAL_DEBUG
+    Serial.print("updated report interval to "); Serial.println(report_interval);
+  #endif
+}
+
+void osc_destination_fn(OSCMessage &msg){
+  int ip = msg.getInt(0);
+  remoteIP[3] = ip;
+  #ifdef SERIAL_DEBUG
+    Serial.print("updated destination to "); Serial.println(ip);
   #endif
 }
 
@@ -304,8 +324,10 @@ void OSCMsgReceive(){
     while(size--)
       msgIN.fill(Udp.read());
     if(!msgIN.hasError()){
-      msgIN.route("/led", led);
-      //msgIN.dispatch(osc_header_report, led);      //for ping option
+      msgIN.dispatch("/led", led_fn);
+      msgIN.dispatch("/interval", measurment_interval_fn);
+      msgIN.dispatch("/report", report_interval_fn);
+      msgIN.dispatch("/destination", osc_destination_fn);
     } else {
       error = msgIN.getError();
       #ifdef SERIAL_DEBUG
