@@ -2,7 +2,7 @@
 #define FIRMWARE_VERSION 2.02   //MAJOR.MINOR more info on: http://semver.org
 #define SERIAL_SPEED 115200       // 9600 for BLE friend
 #define SERIAL_DEBUG true       //coment to turn the serial debuging off
-#define SERIAL_PLOTTER true     // for isolating Arduino IDE serial ploter
+#define SERIAL_PLOTTER false     // for isolating Arduino IDE serial ploter
 // #define STOPWATCH               //run stopwatch to measure timing in code
 #define HOSTNAME "monitor"      // something like: monitor211, to ping or upload firmware over OTA use monitor211.local
 //#define GSR                   // uncomment for version with additional GSR (HR stays on ESPs ADC)
@@ -33,7 +33,7 @@ WiFiUDP Udp;
 OSCErrorCode error;
 
 int report_interval = 3000;      //OSC report inerval 3 secs
-int measurment_interval = 20;       //AD measurment inerval
+int measurment_interval = 50;       //AD measurment inerval
 unsigned long previousMillisReport = 0;
 unsigned long previousMillisMeasurment = 0;
 unsigned long currentMillisReport, currentMillisMeasurment, runningTime;
@@ -415,7 +415,7 @@ void osc_destination_fn(OSCMessage &msg){
   int ip = msg.getInt(0);
   remoteIP[3] = ip;
   #ifdef SERIAL_DEBUG
-    Serial.print("updated destination to "); Serial.println(ip);
+    Serial.print("updated destination to "); Serial.println(remoteIP);
   #endif
 }
 
