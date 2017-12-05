@@ -1,11 +1,11 @@
 //******************************************************************************
-#define FIRMWARE_VERSION 2.06   //MAJOR.MINOR more info on: http://semver.org
+#define FIRMWARE_VERSION 2.10   //MAJOR.MINOR more info on: http://semver.org
 #define SERIAL_SPEED 115200       // 9600 for BLE friend
 #define SERIAL_DEBUG true       //coment to turn the serial debuging off
 #define SERIAL_PLOTTER true     // for isolating Arduino IDE serial ploter
 // #define STOPWATCH               //run stopwatch to measure timing in code
 #define HOSTNAME "monitor"      // something like: monitor211, to ping or upload firmware over OTA use monitor211.local
-//#define GSR                   // uncomment for version with additional GSR (HR stays on ESPs ADC)
+#define GSR                   // uncomment for version with additional GSR (HR stays on ESPs ADC)
 //#define NEOPIXEL
 #define ONBOARDLED              //ESP build in blue led
 //******************************************************************************
@@ -60,8 +60,8 @@ boolean serialPlotterEnable = false;
 #ifdef GSR
   #include <Wire.h>
   #include <Adafruit_ADS1015.h>
-  Adafruit_ADS1115 ads;  /* Use this for the 16-bit version */
-  float ADresolution = 0;
+  // Adafruit_ADS1115 ads;  // Use this for the 16-bit version - first prototype made for workshop with GSR and neopixel
+  Adafruit_ADS1015 ads;     // Use thi for the 12-bit version -  units 203 and 204
 #endif
 
 // normalize function variables
@@ -76,7 +76,7 @@ char osc_header_hr[8];
   char osc_header_gsr[10];
 #endif
 
-bool led_status = 1; // 1 led OFF
+bool led_status = 1; // 1 led OFF, 0 led ON
 int destination;     //last octet of IP OSC destination machine
 
 void setup()
@@ -166,7 +166,7 @@ snprintf(osc_header_hr, 8, "/%d/hr", destination);
 
 // --------------------------- OTA ---------------------------------------------
 char buf[30]; buf[0] = {0};
-snprintf(buf, 30, "%s%i", HOSTNAME, WiFi.localIP()[3]);
+snprintf(buf, 30, "%s%i", HOSTNAME, destination);
 ArduinoOTA.setHostname(buf);
 #ifdef SERIAL_DEBUG
   Serial.print("Hostname: "); Serial.println(buf);
@@ -216,11 +216,10 @@ Udp.begin(localPort);
 //-------------------------- External ADc --------------------------------------
 #ifdef GSR
   #ifdef SERIAL_DEBUG
-    Serial.println("Getting single-ended readings from AIN0..3");
-    Serial.println("ADC Range: +/- 6.144V (1 bit = 0.1875mV/ADS1115)");
+    Serial.println("Getting single-ended readings from AIN0");
+    Serial.println("ADC Range: +/- 6.144V (1 bit = 3mV/ADS1015, 0.1875mV/ADS1115)");
   #endif
-  ads.setGain(GAIN_TWOTHIRDS);      // 2/3x gain +/- 6.144V       0.1875mV (default)
-  ADresolution = 0.1875;
+  ads.setGain(GAIN_TWOTHIRDS);  // 2/3x gain +/- 6.144V  1 bit = 3mV      0.1875mV (default)
   ads.begin();
 #endif
 
@@ -346,9 +345,8 @@ void AD2OSC(){
   voltage_hr.empty();
 
   #ifdef GSR
-    int adc_ext;    //external ADC ADS1115
-    //adc_ext = normalize(0, 16384, ads.readADC_SingleEnded(0));                    //TODO calculate resolution for ADS 1015
-    adc_ext = ads.readADC_SingleEnded(0);                    //TODO calculate resolution for ADS 1015
+    int adc_ext;    //external ADC
+    adc_ext = map(ads.readADC_SingleEnded(0), 0, 4096, 0, 1024);
     OSCMessage voltage_gsr(osc_header_gsr);
     voltage_gsr.add(adc_ext);
     Udp.beginPacket(remoteIP, destPort);
