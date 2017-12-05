@@ -5,7 +5,7 @@
 #define SERIAL_PLOTTER false     // for isolating Arduino IDE serial ploter
 // #define STOPWATCH               //run stopwatch to measure timing in code
 #define HOSTNAME "monitor"      // something like: monitor211, to ping or upload firmware over OTA use monitor211.local
-#define GSR                   // uncomment for version with additional GSR (HR stays on ESPs ADC)
+// #define GSR                   // uncomment for version with additional GSR (HR stays on ESPs ADC)
 //#define NEOPIXEL
 #define ONBOARDLED              //ESP build in blue led
 //******************************************************************************
