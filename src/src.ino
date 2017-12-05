@@ -346,7 +346,8 @@ void AD2OSC(){
 
   #ifdef GSR
     int adc_ext;    //external ADC
-    adc_ext = map(ads.readADC_SingleEnded(0), 0, 4096, 0, 1024);
+    // adc_ext = map(ads.readADC_SingleEnded(0), 0, 4096, 0, 1024);             //map full ADC range (12bit - 4096) to 0-1024
+    adc_ext = ads.readADC_SingleEnded(0);                                       //GSR is giving 1200 max without maping
     OSCMessage voltage_gsr(osc_header_gsr);
     voltage_gsr.add(adc_ext);
     Udp.beginPacket(remoteIP, destPort);
