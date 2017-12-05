@@ -1,5 +1,5 @@
 //******************************************************************************
-#define FIRMWARE_VERSION 2.02   //MAJOR.MINOR more info on: http://semver.org
+#define FIRMWARE_VERSION 2.06   //MAJOR.MINOR more info on: http://semver.org
 #define SERIAL_SPEED 115200       // 9600 for BLE friend
 #define SERIAL_DEBUG true       //coment to turn the serial debuging off
 #define SERIAL_PLOTTER true     // for isolating Arduino IDE serial ploter
@@ -33,7 +33,7 @@ WiFiUDP Udp;
 OSCErrorCode error;
 
 int report_interval = 3000;      //OSC report inerval 3 secs
-int measurment_interval = 20;       //AD measurment inerval
+int measurment_interval = 50;       //AD measurment inerval
 unsigned long previousMillisReport = 0;
 unsigned long previousMillisMeasurment = 0;
 unsigned long currentMillisReport, currentMillisMeasurment, runningTime;
@@ -77,6 +77,7 @@ char osc_header_hr[8];
 #endif
 
 bool led_status = 1; // 1 led OFF
+int destination;     //last octet of IP OSC destination machine
 
 void setup()
 {
@@ -145,13 +146,14 @@ while (WiFi.waitForConnectResult() != WL_CONNECTED) {
   Serial.print("assigned IP address: "); Serial.println(WiFi.localIP());
 #endif
 // ------------------------- OSC headers ---------------------------------------
+destination = WiFi.localIP()[3];
 osc_header_report[0] = {0};  //reset buffor, start with a null string
-snprintf(osc_header_report, 8,"/%d", WiFi.localIP()[3]);
+snprintf(osc_header_report, 8,"/%d", destination);
 osc_header_hr[0] = {0}; //reset buffor, start with a null string
-snprintf(osc_header_hr, 8, "/%d/hr", WiFi.localIP()[3]);
+snprintf(osc_header_hr, 8, "/%d/hr", destination);
 #ifdef GSR
   osc_header_gsr[0] = {0}; //reset buffor, start with a null string
-  snprintf(osc_header_gsr, 10, "/%d/gsr", WiFi.localIP()[3]);
+  snprintf(osc_header_gsr, 10, "/%d/gsr", destination);
 #endif
 
 #ifdef SERIAL_DEBUG
@@ -413,10 +415,10 @@ void report_interval_fn(OSCMessage &msg){
 }
 
 void osc_destination_fn(OSCMessage &msg){
-  int ip = msg.getInt(0);
-  remoteIP[3] = ip;
+  destination = msg.getInt(0);
+  remoteIP[3] = destination;
   #ifdef SERIAL_DEBUG
-    Serial.print("updated destination to "); Serial.println(ip);
+    Serial.print("updated destination to "); Serial.println(destination);
   #endif
 }
 
@@ -571,12 +573,12 @@ void sendReport(){
   destination_ch[0] = {0};
   strcat(destination_ch, osc_header_report);
   strcat(destination_ch, "/destination");
-  OSCMessage destination(destination_ch);
-  destination.add(remoteIP[3]);
+  OSCMessage osc_destination(destination_ch);
+  osc_destination.add(destination);
   Udp.beginPacket(remoteIP, destPort);
-  destination.send(Udp);
+  osc_destination.send(Udp);
   Udp.endPacket();
-  destination.empty();
+  osc_destination.empty();
 
   //OSC plotter feedback
   char plotter_ch[16];
@@ -589,6 +591,7 @@ void sendReport(){
   plotter.send(Udp);
   Udp.endPacket();
   plotter.empty();
+
 
   #ifdef STOPWATCH
     timingMillisRuning = millis() - timingMillisReference;
