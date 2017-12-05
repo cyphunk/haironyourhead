@@ -1,8 +1,9 @@
 //******************************************************************************
-#define FIRMWARE_VERSION 1.98   //MAJOR.MINOR more info on: http://semver.org
-#define SERIAL_SPEED 9600       // 9600 for BLE friend
+#define FIRMWARE_VERSION 2.06   //MAJOR.MINOR more info on: http://semver.org
+#define SERIAL_SPEED 115200       // 9600 for BLE friend
 #define SERIAL_DEBUG true       //coment to turn the serial debuging off
 #define SERIAL_PLOTTER true     // for isolating Arduino IDE serial ploter
+// #define STOPWATCH               //run stopwatch to measure timing in code
 #define HOSTNAME "monitor"      // something like: monitor211, to ping or upload firmware over OTA use monitor211.local
 //#define GSR                   // uncomment for version with additional GSR (HR stays on ESPs ADC)
 //#define NEOPIXEL
@@ -32,10 +33,19 @@ WiFiUDP Udp;
 OSCErrorCode error;
 
 int report_interval = 3000;      //OSC report inerval 3 secs
-int measurment_interval = 10;       //AD measurment inerval
+int measurment_interval = 50;       //AD measurment inerval
 unsigned long previousMillisReport = 0;
 unsigned long previousMillisMeasurment = 0;
 unsigned long currentMillisReport, currentMillisMeasurment, runningTime;
+#if SERIAL_PLOTTER == true
+boolean serialPlotterEnable = true;
+#else
+boolean serialPlotterEnable = false;
+#endif
+
+#ifdef STOPWATCH
+ unsigned long timingMillisReference, timingMillisRuning;
+#endif
 
 #ifdef NEOPIXEL
   #include <FastLED.h>
@@ -63,13 +73,27 @@ unsigned int step = 1;
 char osc_header_report[8];
 char osc_header_hr[8];
 #ifdef GSR
-  char osc_header_gsr[8];
+  char osc_header_gsr[10];
 #endif
+
+bool led_status = 1; // 1 led OFF
+int destination;     //last octet of IP OSC destination machine
 
 void setup()
 {
 #ifdef SERIAL_DEBUG
   Serial.begin(SERIAL_SPEED);
+#endif
+
+#ifdef STOPWATCH
+  #ifdef SERIAL_DEBUG
+    Serial.println(); Serial.println();
+    Serial.print("\r\n- entering setup, reseting stopwatch");
+  #endif
+  timingMillisReference = millis(); //reset stopwatch
+#endif
+
+#ifdef SERIAL_DEBUG
   Serial.println("\r\n--------------------------------");        // compiling info
   Serial.print("HR&GSR Ver: "); Serial.println(FIRMWARE_VERSION);
   Serial.println("by Grzegorz Zajac and Nathan Andrew Fain");
@@ -96,7 +120,7 @@ void setup()
 
 #ifdef ONBOARDLED
   pinMode(BUILD_IN_LED, OUTPUT);
-  digitalWrite(BUILD_IN_LED,HIGH); //off by default
+  digitalWrite(BUILD_IN_LED,led_status); //off by default
 #endif
 
 //---------------------------- WiFi --------------------------------------------
@@ -122,13 +146,14 @@ while (WiFi.waitForConnectResult() != WL_CONNECTED) {
   Serial.print("assigned IP address: "); Serial.println(WiFi.localIP());
 #endif
 // ------------------------- OSC headers ---------------------------------------
+destination = WiFi.localIP()[3];
 osc_header_report[0] = {0};  //reset buffor, start with a null string
-snprintf(osc_header_report, 8,"/%d", WiFi.localIP()[3]);
+snprintf(osc_header_report, 8,"/%d", destination);
 osc_header_hr[0] = {0}; //reset buffor, start with a null string
-snprintf(osc_header_hr, 8, "/%d/hr", WiFi.localIP()[3]);
+snprintf(osc_header_hr, 8, "/%d/hr", destination);
 #ifdef GSR
   osc_header_gsr[0] = {0}; //reset buffor, start with a null string
-  snprintf(osc_header_gsr, 8, "/%d/gsr", WiFi.localIP()[3]);
+  snprintf(osc_header_gsr, 10, "/%d/gsr", destination);
 #endif
 
 #ifdef SERIAL_DEBUG
@@ -172,7 +197,7 @@ ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
   FastLED.showColor(CHSV(HUE_BLUE, 255, 0));
 #endif
 #ifdef ONBOARDLED
-  digitalWrite(BUILD_IN_LED, LOW); delay(1); digitalWrite(BUILD_IN_LED, HIGH);  //flash when uploading
+  digitalWrite(BUILD_IN_LED, !led_status); delay(1); digitalWrite(BUILD_IN_LED, led_status);  //flash when uploading
 #endif
 });
 ArduinoOTA.onError([](ota_error_t error) {
@@ -206,14 +231,46 @@ FastLED.showColor(CHSV(HUE_GREEN, 255, 0));
 #endif
 
 #ifdef ONBOARDLED    //turn led on if connected
-digitalWrite(BUILD_IN_LED, LOW);
+led_status = 0;
+digitalWrite(BUILD_IN_LED, led_status);
 #endif
 
+#ifdef STOPWATCH
+  timingMillisRuning = millis() - timingMillisReference;
+  #ifdef SERIAL_DEBUG
+    Serial.print("- setup time: "); Serial.println(timingMillisRuning);
+  #endif
+#endif
 }
 
 void loop() {
+  #ifdef STOPWATCH
+    #ifdef SERIAL_DEBUG
+      Serial.println("\r\n- starting loop");
+    #endif
+    timingMillisReference = millis(); //reset stopwatch
+  #endif
+
   ArduinoOTA.handle();
+
+  #ifdef STOPWATCH
+    timingMillisRuning = millis() - timingMillisReference;
+    #ifdef SERIAL_DEBUG
+      Serial.print("  OTA fn time: "); Serial.println(timingMillisRuning);
+    #endif
+  #endif
+  #ifdef STOPWATCH
+    timingMillisReference = millis(); //reset stopwatch
+  #endif
+
   OSCMsgReceive();
+
+  #ifdef STOPWATCH
+    timingMillisRuning = millis() - timingMillisReference;
+    #ifdef SERIAL_DEBUG
+      Serial.print("  OSC receive fn time: "); Serial.println(timingMillisRuning);
+    #endif
+  #endif
 
   currentMillisMeasurment = millis();
   if (currentMillisMeasurment - previousMillisMeasurment >= (measurment_interval)) {
@@ -231,17 +288,56 @@ void loop() {
 }
 
 void AD2OSC(){
-  int adc_int;       //internal ESP ADC
-  adc_int = normalize(0, 1024, analogRead(A0));
+  #ifdef STOPWATCH
+    #ifdef SERIAL_DEBUG
+      Serial.println("\r\n   starting AD2OSC");
+    #endif
+    timingMillisReference = millis(); //reset stopwatch
+  #endif
 
-  #ifdef SERIAL_DEBUG
-    #ifdef SERIAL_PLOTTER  //for Arduino IDE serial ploter
-    Serial.print(adc_int); Serial.print(",");
-    Serial.print(sliding_min); Serial.print(",");
-    Serial.println(sliding_max);
+  int adc_int;       //internal ESP ADC
+  adc_int = analogRead(A0);
+
+  #ifdef STOPWATCH
+    timingMillisRuning = millis() - timingMillisReference;
+    #ifdef SERIAL_DEBUG
+      Serial.print("   AD sampling time: "); Serial.println(timingMillisRuning);
     #endif
   #endif
 
+  #ifdef STOPWATCH
+    timingMillisReference = millis(); //reset stopwatch
+  #endif
+
+  adc_int = normalize(0, 1024, adc_int);
+
+  #ifdef STOPWATCH
+    timingMillisRuning = millis() - timingMillisReference;
+    #ifdef SERIAL_DEBUG
+      Serial.print("   normalizing time: "); Serial.println(timingMillisRuning);
+    #endif
+  #endif
+
+  #ifdef STOPWATCH
+    timingMillisReference = millis(); //reset stopwatch
+  #endif
+
+    if (serialPlotterEnable && Serial) {
+        Serial.print(adc_int); Serial.print(",");
+        Serial.print(sliding_min); Serial.print(",");
+        Serial.println(sliding_max);
+    }
+
+  #ifdef STOPWATCH
+    timingMillisRuning = millis() - timingMillisReference;
+    #ifdef SERIAL_DEBUG
+      Serial.print("   serial2ploter time: "); Serial.println(timingMillisRuning);
+    #endif
+  #endif
+
+  #ifdef STOPWATCH
+    timingMillisReference = millis(); //reset stopwatch
+  #endif
   OSCMessage voltage_hr(osc_header_hr);
   voltage_hr.add(adc_int);
   Udp.beginPacket(remoteIP, destPort);
@@ -251,13 +347,21 @@ void AD2OSC(){
 
   #ifdef GSR
     int adc_ext;    //external ADC ADS1115
-    adc_ext = normalize(0, 16384, ads.readADC_SingleEnded(0));                    //TODO calculate resolution for ADS 1015
+    //adc_ext = normalize(0, 16384, ads.readADC_SingleEnded(0));                    //TODO calculate resolution for ADS 1015
+    adc_ext = ads.readADC_SingleEnded(0);                    //TODO calculate resolution for ADS 1015
     OSCMessage voltage_gsr(osc_header_gsr);
     voltage_gsr.add(adc_ext);
     Udp.beginPacket(remoteIP, destPort);
     voltage_gsr.send(Udp);
     Udp.endPacket();
     voltage_gsr.empty();
+  #endif
+
+  #ifdef STOPWATCH
+    timingMillisRuning = millis() - timingMillisReference;
+    #ifdef SERIAL_DEBUG
+      Serial.print("   osc send time: "); Serial.println(timingMillisRuning);
+    #endif
   #endif
 }
 
@@ -268,8 +372,11 @@ unsigned long normalize(unsigned long value_min, unsigned long value_max, unsign
     // those walls they are expanded by `step`. when the value is below those walls they are
     // further enclosed by step
 
+    // first run (when sliding_min == -1):
     if (sliding_min < 0) sliding_min = value_min;
+    // value is lower than expected, make floor this value:
     else if (value < sliding_min) sliding_min = value;
+    // value is above floor, slowly move floor up:
     else if (value > sliding_min && sliding_min+step < sliding_max) sliding_min += step;
 
     if (sliding_max < 0) sliding_max = value_max;
@@ -287,11 +394,9 @@ unsigned long normalize(unsigned long value_min, unsigned long value_max, unsign
 }
 
 void led_fn(OSCMessage &msg) {
-  int led_on_off = msg.getInt(0);
-
+  led_status = msg.getInt(0);
   #ifdef ONBOARDLED
-    if (led_on_off == 0) digitalWrite(BUILD_IN_LED, HIGH);
-    if (led_on_off == 1) digitalWrite(BUILD_IN_LED, LOW);
+    digitalWrite(BUILD_IN_LED, led_status);
   #endif
 }
 
@@ -310,11 +415,24 @@ void report_interval_fn(OSCMessage &msg){
 }
 
 void osc_destination_fn(OSCMessage &msg){
-  int ip = msg.getInt(0);
-  remoteIP[3] = ip;
+  destination = msg.getInt(0);
+  remoteIP[3] = destination;
   #ifdef SERIAL_DEBUG
-    Serial.print("updated destination to "); Serial.println(ip);
+    Serial.print("updated destination to "); Serial.println(destination);
   #endif
+}
+
+void serial_plot_fn(OSCMessage &msg){
+  int onoff = msg.getInt(0);
+  if (onoff != 1) {
+    // == 0  disable Serial port and exit
+    serialPlotterEnable = false;
+    Serial.end();
+    return;
+  }
+  if (!Serial)
+    Serial.begin(SERIAL_SPEED);
+  serialPlotterEnable = true;
 }
 
 void OSCMsgReceive(){
@@ -328,6 +446,7 @@ void OSCMsgReceive(){
       msgIN.dispatch("/interval", measurment_interval_fn);
       msgIN.dispatch("/report", report_interval_fn);
       msgIN.dispatch("/destination", osc_destination_fn);
+      msgIN.dispatch("/serialplot", serial_plot_fn);
     } else {
       error = msgIN.getError();
       #ifdef SERIAL_DEBUG
@@ -340,8 +459,15 @@ void OSCMsgReceive(){
 }
 
 void sendReport(){
+  #ifdef STOPWATCH
+    #ifdef SERIAL_DEBUG
+      Serial.println("\r\n   starting report fn");
+    #endif
+    timingMillisReference = millis(); //reset stopwatch
+  #endif
+
   //rssi
-  char rssi_ch[32];
+  char rssi_ch[32];                                                             //TODO build function for OSC sending message
   rssi_ch[0] = {0};
   int32_t RSSI = WiFi.RSSI(); //check if rssi is for current network
   strcat(rssi_ch, osc_header_report);
@@ -391,18 +517,86 @@ void sendReport(){
   Udp.endPacket();
   channel.empty();
 
-  #ifdef GSR
-    float adc2;
-    adc2 = ((ads.readADC_SingleEnded(2) * ADresolution)/1000);
-    char volt_ch3[8];
-    volt_ch3[0] = {0}; //reset buffor
-    strcat(volt_ch3, osc_header_report);
-    strcat(volt_ch3, "/lipo"); //build OSC message with unit ID
-    OSCMessage voltage3(volt_ch3);
-    voltage3.add(adc2);
-    Udp.beginPacket(remoteIP, destPort);
-    voltage3.send(Udp);
-    Udp.endPacket();
-    voltage3.empty();
+  // #ifdef GSR               // not connected yet
+  //   float adc2;
+  //   adc2 = ((ads.readADC_SingleEnded(3) * ADresolution)/1000);
+  //   char volt_ch3[8];
+  //   volt_ch3[0] = {0}; //reset buffor
+  //   strcat(volt_ch3, osc_header_report);
+  //   strcat(volt_ch3, "/lipo"); //build OSC message with unit ID
+  //   OSCMessage voltage3(volt_ch3);
+  //   voltage3.add(adc2);
+  //   Udp.beginPacket(remoteIP, destPort);
+  //   voltage3.send(Udp);
+  //   Udp.endPacket();
+  //   voltage3.empty();
+  // #endif
+
+  //led status feedback
+  char led_ch[16];
+  led_ch[0] = {0};
+  strcat(led_ch, osc_header_report);
+  strcat(led_ch, "/led");
+  OSCMessage led(led_ch);
+  led.add(led_status);
+  Udp.beginPacket(remoteIP, destPort);
+  led.send(Udp);
+  Udp.endPacket();
+  led.empty();
+
+  //AD measurment interval status feedback
+  char interval_ch[16];
+  interval_ch[0] = {0};
+  strcat(interval_ch, osc_header_report);
+  strcat(interval_ch, "/interval");
+  OSCMessage interval(interval_ch);
+  interval.add(measurment_interval);
+  Udp.beginPacket(remoteIP, destPort);
+  interval.send(Udp);
+  Udp.endPacket();
+  interval.empty();
+
+  //report interval status feedback
+  char report_ch[16];
+  report_ch[0] = {0};
+  strcat(report_ch, osc_header_report);
+  strcat(report_ch, "/report");
+  OSCMessage report(report_ch);
+  report.add(report_interval);
+  Udp.beginPacket(remoteIP, destPort);
+  report.send(Udp);
+  Udp.endPacket();
+  report.empty();
+
+  //OSC destination feedback
+  char destination_ch[16];
+  destination_ch[0] = {0};
+  strcat(destination_ch, osc_header_report);
+  strcat(destination_ch, "/destination");
+  OSCMessage osc_destination(destination_ch);
+  osc_destination.add(destination);
+  Udp.beginPacket(remoteIP, destPort);
+  osc_destination.send(Udp);
+  Udp.endPacket();
+  osc_destination.empty();
+
+  //OSC plotter feedback
+  char plotter_ch[16];
+  plotter_ch[0] = {0};
+  strcat(plotter_ch, osc_header_report);
+  strcat(plotter_ch, "/plotter");
+  OSCMessage plotter(plotter_ch);
+  plotter.add(serialPlotterEnable);
+  Udp.beginPacket(remoteIP, destPort);
+  plotter.send(Udp);
+  Udp.endPacket();
+  plotter.empty();
+
+
+  #ifdef STOPWATCH
+    timingMillisRuning = millis() - timingMillisReference;
+    #ifdef SERIAL_DEBUG
+      Serial.print("   osc report time: "); Serial.println(timingMillisRuning);
+    #endif
   #endif
 }
