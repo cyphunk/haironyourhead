@@ -5,7 +5,7 @@
 #define SERIAL_PLOTTER false     // for isolating Arduino IDE serial ploter
 // #define STOPWATCH               //run stopwatch to measure timing in code
 #define HOSTNAME "monitor"      // something like: monitor211, to ping or upload firmware over OTA use monitor211.local
-// #define GSR                   // uncomment for version with additional GSR (HR stays on ESPs ADC)
+#define GSR                   // uncomment for version with additional GSR (HR stays on ESPs ADC)
 //#define NEOPIXEL
 #define ONBOARDLED              //ESP build in blue led
 //******************************************************************************
@@ -172,6 +172,8 @@ ArduinoOTA.setHostname(buf);
   Serial.print("Hostname: "); Serial.println(buf);
 #endif
 
+ArduinoOTA.setPort(8080);
+
 ArduinoOTA.onStart([]() {
   #ifdef SERIAL_DEBUG
     Serial.println("Start updating ");
@@ -205,9 +207,10 @@ ArduinoOTA.onError([](ota_error_t error) {
   Serial.printf("Error[%u]: ", error);
   if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");                   //TODO add red led feedback
   else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-  else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+  else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed. Firewall Issue ?");
   else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
   else if (error == OTA_END_ERROR) Serial.println("End Failed");
+  
 #endif
 });
 ArduinoOTA.begin();
