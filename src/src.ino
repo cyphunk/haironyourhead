@@ -1,5 +1,5 @@
 //******************************************************************************
-#define FIRMWARE_VERSION 2.10   //MAJOR.MINOR more info on: http://semver.org
+const int firmware_version = 20;   //MAJOR.MINOR more info on: http://semver.org  Version as integer to simplify sending OSC report
 #define SERIAL_SPEED 115200       // 9600 for BLE friend
 #define SERIAL_DEBUG true       //coment to turn the serial debuging off
 #define SERIAL_PLOTTER false     // for isolating Arduino IDE serial ploter
@@ -85,7 +85,7 @@ char osc_header_hr[8];
 #endif
 
 bool led_status = 1; // 1 led OFF, 0 led ON
-int destination;     //last octet of IP OSC destination machine
+int destination;     //last octet of IP OSC destination machine, defined in credentials.h file
 
 void setup()
 {
@@ -103,7 +103,7 @@ void setup()
 
 #ifdef SERIAL_DEBUG
   Serial.println("\r\n--------------------------------");        // compiling info
-  Serial.print("HR&GSR Ver: "); Serial.println(FIRMWARE_VERSION);
+  Serial.print("HR&GSR Ver: "); Serial.println(firmware_version);
   Serial.println("by Grzegorz Zajac and Nathan Andrew Fain");
   Serial.println("Compiled: " __DATE__ ", " __TIME__ ", " __VERSION__);
   Serial.println("---------------------------------");
@@ -213,7 +213,7 @@ ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
 ArduinoOTA.onError([](ota_error_t error) {
 #ifdef SERIAL_DEBUG
   Serial.printf("Error[%u]: ", error);
-  if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");                   //TODO add red led feedback
+  if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
   else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
   else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed. Firewall Issue ?");
   else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
@@ -227,7 +227,7 @@ Udp.begin(localPort);
 //-------------------------- External ADc --------------------------------------
 #ifdef GSR
   #ifdef SERIAL_DEBUG
-    Serial.println("Getting single-ended readings from AIN0");
+    Serial.println("Getting single-ended readings from AIN0..3");
     Serial.println("ADC Range: +/- 6.144V (1 bit = 3mV/ADS1015, 0.1875mV/ADS1115)");
   #endif
   ads.setGain(GAIN_TWOTHIRDS);  // 2/3x gain +/- 6.144V  1 bit = 3mV      0.1875mV (default)
@@ -298,7 +298,7 @@ void loop() {
     currentMillisReport = millis();
     if (currentMillisReport - previousMillisReport >= (report_interval)) {
       previousMillisReport = currentMillisReport;
-      sendReport();                                                               //TODO send report to diffrent port or IP, separate from server
+      sendReport();
     }
   }
 }
@@ -457,21 +457,33 @@ void OSCMsgReceive(){
   if((size = Udp.parsePacket())>0){
     while(size--)
       msgIN.fill(Udp.read());
-    if(!msgIN.hasError()){
-      msgIN.dispatch("/led", led_fn);
-      msgIN.dispatch("/interval", measurment_interval_fn);
-      msgIN.dispatch("/report", report_interval_fn);
-      msgIN.dispatch("/destination", osc_destination_fn);
-      msgIN.dispatch("/serialplot", serial_plot_fn);
-    } else {
-      error = msgIN.getError();
-      #ifdef SERIAL_DEBUG
-        Serial.print("error: ");
-        Serial.println(error);
-      #endif
-
-    }
+        if(!msgIN.hasError()){
+          msgIN.dispatch("/led", led_fn);
+          msgIN.dispatch("/interval", measurment_interval_fn);
+          msgIN.dispatch("/report", report_interval_fn);
+          msgIN.dispatch("/destination", osc_destination_fn);
+          msgIN.dispatch("/serialplot", serial_plot_fn);
+        } else {
+          error = msgIN.getError();
+          #ifdef SERIAL_DEBUG
+            Serial.print("error: ");
+            Serial.println(error);
+          #endif
+          }
   }
+}
+
+void sendOSCmessage(char* name, int value){
+  char message_osc_header[16];
+  message_osc_header[0] = {0};
+  strcat(message_osc_header, osc_header_report);
+  strcat(message_osc_header, name);
+  OSCMessage message(message_osc_header);
+  message.add(value);
+  Udp.beginPacket(remoteIP, destPort);
+  message.send(Udp);
+  Udp.endPacket();
+  message.empty();
 }
 
 void sendReport(){
@@ -482,132 +494,15 @@ void sendReport(){
     timingMillisReference = millis(); //reset stopwatch
   #endif
 
-  //rssi
-  char rssi_ch[32];                                                             //TODO build function for OSC sending message
-  rssi_ch[0] = {0};
-  int32_t RSSI = WiFi.RSSI(); //check if rssi is for current network
-  strcat(rssi_ch, osc_header_report);
-  strcat(rssi_ch, "/rssi");
-  OSCMessage rssi(rssi_ch);
-  rssi.add(RSSI);
-  Udp.beginPacket(remoteIP, destPort);
-  rssi.send(Udp);
-  Udp.endPacket();
-  rssi.empty();
-
-  // running time
-  char time_ch[32];
-  time_ch[0] = {0};
-  unsigned int runningTime = millis()/1000;
-  strcat(time_ch, osc_header_report);
-  strcat(time_ch, "/time");
-  OSCMessage rtime(time_ch);
-  rtime.add(runningTime);
-  Udp.beginPacket(remoteIP, destPort);
-  rtime.send(Udp);
-  Udp.endPacket();
-  rtime.empty();
-
-  //version
-  char ver_ch[16];
-  ver_ch[0] = {0};
-  strcat(ver_ch, osc_header_report);
-  strcat(ver_ch, "/ver");
-  OSCMessage ver(ver_ch);
-  float Ver = FIRMWARE_VERSION; //silly conversion, Max MSP not happy with direct FIRMWARE_VERSION send
-  ver.add(Ver);
-  Udp.beginPacket(remoteIP, destPort);
-  ver.send(Udp);
-  Udp.endPacket();
-  ver.empty();
-
-  //channel
-  char ch_ch[16];
-  ch_ch[0] = {0};
-  strcat(ch_ch, osc_header_report);
-  strcat(ch_ch, "/channel");
-  OSCMessage channel(ch_ch);
-  channel.add(WiFi.channel());
-  Udp.beginPacket(remoteIP, destPort);
-  channel.send(Udp);
-  Udp.endPacket();
-  channel.empty();
-
-  // #ifdef GSR               // not connected yet
-  //   float adc2;
-  //   adc2 = ((ads.readADC_SingleEnded(3) * ADresolution)/1000);
-  //   char volt_ch3[8];
-  //   volt_ch3[0] = {0}; //reset buffor
-  //   strcat(volt_ch3, osc_header_report);
-  //   strcat(volt_ch3, "/lipo"); //build OSC message with unit ID
-  //   OSCMessage voltage3(volt_ch3);
-  //   voltage3.add(adc2);
-  //   Udp.beginPacket(remoteIP, destPort);
-  //   voltage3.send(Udp);
-  //   Udp.endPacket();
-  //   voltage3.empty();
-  // #endif
-
-  //led status feedback
-  char led_ch[16];
-  led_ch[0] = {0};
-  strcat(led_ch, osc_header_report);
-  strcat(led_ch, "/led");
-  OSCMessage led(led_ch);
-  led.add(led_status);
-  Udp.beginPacket(remoteIP, destPort);
-  led.send(Udp);
-  Udp.endPacket();
-  led.empty();
-
-  //AD measurment interval status feedback
-  char interval_ch[16];
-  interval_ch[0] = {0};
-  strcat(interval_ch, osc_header_report);
-  strcat(interval_ch, "/interval");
-  OSCMessage interval(interval_ch);
-  interval.add(measurment_interval);
-  Udp.beginPacket(remoteIP, destPort);
-  interval.send(Udp);
-  Udp.endPacket();
-  interval.empty();
-
-  //report interval status feedback
-  char report_ch[16];
-  report_ch[0] = {0};
-  strcat(report_ch, osc_header_report);
-  strcat(report_ch, "/report");
-  OSCMessage report(report_ch);
-  report.add(report_interval);
-  Udp.beginPacket(remoteIP, destPort);
-  report.send(Udp);
-  Udp.endPacket();
-  report.empty();
-
-  //OSC destination feedback
-  char destination_ch[16];
-  destination_ch[0] = {0};
-  strcat(destination_ch, osc_header_report);
-  strcat(destination_ch, "/destination");
-  OSCMessage osc_destination(destination_ch);
-  osc_destination.add(destination);
-  Udp.beginPacket(remoteIP, destPort);
-  osc_destination.send(Udp);
-  Udp.endPacket();
-  osc_destination.empty();
-
-  //OSC plotter feedback
-  char plotter_ch[16];
-  plotter_ch[0] = {0};
-  strcat(plotter_ch, osc_header_report);
-  strcat(plotter_ch, "/plotter");
-  OSCMessage plotter(plotter_ch);
-  plotter.add(serialPlotterEnable);
-  Udp.beginPacket(remoteIP, destPort);
-  plotter.send(Udp);
-  Udp.endPacket();
-  plotter.empty();
-
+  sendOSCmessage("/ver", firmware_version);
+  sendOSCmessage("/rssi", WiFi.RSSI());
+  sendOSCmessage("/time", (millis()/1000));
+  sendOSCmessage("/channel", WiFi.channel());
+  sendOSCmessage("/led", led_status);
+  sendOSCmessage("/interval", measurment_interval);
+  sendOSCmessage("/report", report_interval);
+  sendOSCmessage("/destination", destination);
+  sendOSCmessage("/plotter", serialPlotterEnable);
 
   #ifdef STOPWATCH
     timingMillisRuning = millis() - timingMillisReference;
