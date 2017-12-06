@@ -76,8 +76,9 @@ char osc_header_hr[8];
   char osc_header_gsr[10];
 #endif
 
-bool led_status = 1; // 1 led OFF, 0 led ON
-int destination;     //last octet of IP OSC destination machine
+bool led_status = 1;   // 1 led OFF, 0 led ON
+int destination = 255; //last octet of IP OSC destination machine. 255=broadcast default
+IPAddress remoteIP;    //dynamically created based on device IP + destination
 
 void setup()
 {
@@ -145,6 +146,14 @@ while (WiFi.waitForConnectResult() != WL_CONNECTED) {
 #ifdef SERIAL_DEBUG
   Serial.print("assigned IP address: "); Serial.println(WiFi.localIP());
 #endif
+
+// remoteIP = localIP + the destination var as last octet
+remoteIP    = WiFi.localIP();
+remoteIP[3] = destination;
+#ifdef SERIAL_DEBUG
+  Serial.print("remote IP address default: "); Serial.println(remoteIP);
+#endif
+
 // ------------------------- OSC headers ---------------------------------------
 destination = WiFi.localIP()[3];
 osc_header_report[0] = {0};  //reset buffor, start with a null string
