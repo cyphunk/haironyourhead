@@ -1,5 +1,5 @@
 //******************************************************************************
-const int firmware_version = 21;   //MAJOR.MINOR more info on: http://semver.org  Version as integer to simplify sending OSC report
+const int firmware_version = 22;   //MAJOR.MINOR more info on: http://semver.org  Version as integer to simplify sending OSC report
 #define SERIAL_SPEED 115200       // 9600 for BLE friend
 #define SERIAL_DEBUG true       //coment to turn the serial debuging off
 #define SERIAL_PLOTTER false     // for isolating Arduino IDE serial ploter
@@ -83,6 +83,7 @@ char osc_header_gsr[10];
 bool led_status = 1;   // 1 led OFF, 0 led ON
 int destination = 255; //last octet of IP OSC destination machine. 255=broadcast default
 IPAddress remoteIP;    //dynamically created based on device IP + destination
+int unit_ID;
 
 int i2c_adc_address = 0x48;         //0x48 (1001000) ADR -> GND
                                     // 0x49 (1001001) ADR -> VDD
@@ -174,15 +175,15 @@ remoteIP[3] = destination;
 #endif
 
 // ------------------------- OSC headers ---------------------------------------
-destination = WiFi.localIP()[3];
+ unit_ID = WiFi.localIP()[3];
 osc_header_report[0] = {0};  //reset buffor, start with a null string
-snprintf(osc_header_report, 8,"/%d", destination);
+snprintf(osc_header_report, 8,"/%d", unit_ID);
 osc_header_hr[0] = {0}; //reset buffor, start with a null string
-snprintf(osc_header_hr, 8, "/%d/hr", destination);
+snprintf(osc_header_hr, 8, "/%d/hr", unit_ID);
 
 if (external_adac_present){
   osc_header_gsr[0] = {0}; //reset buffor, start with a null string
-  snprintf(osc_header_gsr, 10, "/%d/gsr", destination);
+  snprintf(osc_header_gsr, 10, "/%d/gsr", unit_ID);
 }
 
 #ifdef SERIAL_DEBUG
@@ -195,7 +196,7 @@ if (external_adac_present){
 
 // --------------------------- OTA ---------------------------------------------
 char buf[30]; buf[0] = {0};
-snprintf(buf, 30, "%s%i", HOSTNAME, destination);
+snprintf(buf, 30, "%s%i", HOSTNAME, unit_ID);
 ArduinoOTA.setHostname(buf);
 #ifdef SERIAL_DEBUG
   Serial.print("Hostname: "); Serial.println(buf);
@@ -516,12 +517,12 @@ void sendReport(){
   sendOSCmessage("/ver", firmware_version);
   sendOSCmessage("/rssi", WiFi.RSSI());
   sendOSCmessage("/channel", WiFi.channel());
-  sendOSCmessage("/time", (millis()/1000));
+  sendOSCmessage("/time", (millis()/1000));               //running time in secs
   sendOSCmessage("/plotter", serialPlotterEnable);
   sendOSCmessage("/ext_adac", external_adac_present);
   sendOSCmessage("/led", led_status);
-  sendOSCmessage("/report", report_interval);
-  sendOSCmessage("/interval", measurment_interval);
+  sendOSCmessage("/report", report_interval); delay(1);    //TODO investigate why next couple of messages are droped without the delay
+  sendOSCmessage("/interval", measurment_interval);        //TODO seems to does not send, to check!
   sendOSCmessage("/destination", destination);
 
   #ifdef STOPWATCH
