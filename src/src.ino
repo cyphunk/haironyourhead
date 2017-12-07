@@ -1,11 +1,10 @@
 //******************************************************************************
-#define FIRMWARE_VERSION 2.06   //MAJOR.MINOR more info on: http://semver.org
+const int firmware_version = 22;   //MAJOR.MINOR more info on: http://semver.org  Version as integer to simplify sending OSC report
 #define SERIAL_SPEED 115200       // 9600 for BLE friend
 #define SERIAL_DEBUG true       //coment to turn the serial debuging off
-#define SERIAL_PLOTTER true     // for isolating Arduino IDE serial ploter
+#define SERIAL_PLOTTER false     // for isolating Arduino IDE serial ploter
 // #define STOPWATCH               //run stopwatch to measure timing in code
 #define HOSTNAME "monitor"      // something like: monitor211, to ping or upload firmware over OTA use monitor211.local
-//#define GSR                   // uncomment for version with additional GSR (HR stays on ESPs ADC)
 //#define NEOPIXEL
 #define ONBOARDLED              //ESP build in blue led
 //******************************************************************************
@@ -37,10 +36,11 @@ int measurment_interval = 50;       //AD measurment inerval
 unsigned long previousMillisReport = 0;
 unsigned long previousMillisMeasurment = 0;
 unsigned long currentMillisReport, currentMillisMeasurment, runningTime;
+
 #if SERIAL_PLOTTER == true
-boolean serialPlotterEnable = true;
-#else
-boolean serialPlotterEnable = false;
+  bool serialPlotterEnable = 1;
+  #else
+  bool serialPlotterEnable = 0;
 #endif
 
 #ifdef STOPWATCH
@@ -57,12 +57,18 @@ boolean serialPlotterEnable = false;
   #define BUILD_IN_LED 02
 #endif
 
-#ifdef GSR
-  #include <Wire.h>
-  #include <Adafruit_ADS1015.h>
-  Adafruit_ADS1115 ads;  /* Use this for the 16-bit version */
-  float ADresolution = 0;
-#endif
+#include <Wire.h>
+#include <Adafruit_ADS1015.h>
+// Adafruit_ADS1115 ads;  // Use this for the 16-bit version - first prototype made for workshop with GSR and neopixel
+Adafruit_ADS1015 ads;     // Use thi for the 12-bit version -  units 203 and 204
+
+// static uint16_t readRegister(uint8_t i2cAddress, uint8_t reg) {
+//   Wire.beginTransmission(i2cAddress);
+//   Wire.write((uint8_t)ADS1015_REG_POINTER_CONVERT);
+//   Wire.endTransmission();
+//   Wire.requestFrom(i2cAddress, (uint8_t)2);
+//   return ((Wire.read() << 8) | Wire.read());
+// }
 
 // normalize function variables
 long sliding_min = -1;
@@ -72,12 +78,18 @@ unsigned int step = 1;
 //OSC message headers
 char osc_header_report[8];
 char osc_header_hr[8];
-#ifdef GSR
-  char osc_header_gsr[10];
-#endif
+char osc_header_gsr[10];
 
-bool led_status = 1; // 1 led OFF
-int destination;     //last octet of IP OSC destination machine
+bool led_status = 1;   // 1 led OFF, 0 led ON
+int destination = 255; //last octet of IP OSC destination machine. 255=broadcast default
+IPAddress remoteIP;    //dynamically created based on device IP + destination
+int unit_ID;
+
+int i2c_adc_address = 0x48;         //0x48 (1001000) ADR -> GND
+                                    // 0x49 (1001001) ADR -> VDD
+                                    // 0x4A (1001010) ADR -> SDA
+                                    // 0x4B (1001011) ADR -> SCL
+bool external_adac_present = 0;
 
 void setup()
 {
@@ -95,7 +107,7 @@ void setup()
 
 #ifdef SERIAL_DEBUG
   Serial.println("\r\n--------------------------------");        // compiling info
-  Serial.print("HR&GSR Ver: "); Serial.println(FIRMWARE_VERSION);
+  Serial.print("HR&GSR Ver: "); Serial.println(firmware_version);
   Serial.println("by Grzegorz Zajac and Nathan Andrew Fain");
   Serial.println("Compiled: " __DATE__ ", " __TIME__ ", " __VERSION__);
   Serial.println("---------------------------------");
@@ -123,6 +135,15 @@ void setup()
   digitalWrite(BUILD_IN_LED,led_status); //off by default
 #endif
 
+// external ADC presence test
+Wire.begin();
+Wire.beginTransmission(i2c_adc_address);
+if (Wire.endTransmission() == 0) {external_adac_present = 1;}
+
+#ifdef SERIAL_DEBUG
+  Serial.print("External ADAC: "); Serial.println(external_adac_present);
+#endif
+
 //---------------------------- WiFi --------------------------------------------
 WiFi.mode(WIFI_STA);  // https://www.arduino.cc/en/Reference/WiFiConfig
 // WiFi.config(ip, gateway, subnet);  //uncomment for fixed ip address, needs to be defined in credentials.h file
@@ -145,32 +166,43 @@ while (WiFi.waitForConnectResult() != WL_CONNECTED) {
 #ifdef SERIAL_DEBUG
   Serial.print("assigned IP address: "); Serial.println(WiFi.localIP());
 #endif
-// ------------------------- OSC headers ---------------------------------------
-destination = WiFi.localIP()[3];
-osc_header_report[0] = {0};  //reset buffor, start with a null string
-snprintf(osc_header_report, 8,"/%d", destination);
-osc_header_hr[0] = {0}; //reset buffor, start with a null string
-snprintf(osc_header_hr, 8, "/%d/hr", destination);
-#ifdef GSR
-  osc_header_gsr[0] = {0}; //reset buffor, start with a null string
-  snprintf(osc_header_gsr, 10, "/%d/gsr", destination);
+
+// remoteIP = localIP + the destination var as last octet
+remoteIP    = WiFi.localIP();
+remoteIP[3] = destination;
+#ifdef SERIAL_DEBUG
+  Serial.print("remote IP address default: "); Serial.println(remoteIP);
 #endif
+
+// ------------------------- OSC headers ---------------------------------------
+ unit_ID = WiFi.localIP()[3];
+osc_header_report[0] = {0};  //reset buffor, start with a null string
+snprintf(osc_header_report, 8,"/%d", unit_ID);
+osc_header_hr[0] = {0}; //reset buffor, start with a null string
+snprintf(osc_header_hr, 8, "/%d/hr", unit_ID);
+
+if (external_adac_present){
+  osc_header_gsr[0] = {0}; //reset buffor, start with a null string
+  snprintf(osc_header_gsr, 10, "/%d/gsr", unit_ID);
+}
 
 #ifdef SERIAL_DEBUG
   Serial.print("osc report header: "); Serial.println(osc_header_report);
   Serial.print("osc hr header: "); Serial.println(osc_header_hr);
-  #ifdef GSR
+  if (external_adac_present){
     Serial.print("osc gsr header: "); Serial.println(osc_header_gsr);
-  #endif
+  }
 #endif
 
 // --------------------------- OTA ---------------------------------------------
 char buf[30]; buf[0] = {0};
-snprintf(buf, 30, "%s%i", HOSTNAME, WiFi.localIP()[3]);
+snprintf(buf, 30, "%s%i", HOSTNAME, unit_ID);
 ArduinoOTA.setHostname(buf);
 #ifdef SERIAL_DEBUG
   Serial.print("Hostname: "); Serial.println(buf);
 #endif
+
+ArduinoOTA.setPort(8080);
 
 ArduinoOTA.onStart([]() {
   #ifdef SERIAL_DEBUG
@@ -179,60 +211,64 @@ ArduinoOTA.onStart([]() {
 });
 
 ArduinoOTA.onEnd([]() {
-#ifdef SERIAL_DEBUG
-  Serial.println("\nEnd");
-#endif
-#ifdef NEOPIXEL
-  FastLED.showColor(CHSV(HUE_ORANGE, 255, 200));
-#endif
-
+  #ifdef SERIAL_DEBUG
+    Serial.println("\nEnd");
+  #endif
+  #ifdef NEOPIXEL
+    FastLED.showColor(CHSV(HUE_ORANGE, 255, 200));
+  #endif
 });
 ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-#ifdef SERIAL_DEBUG
-  Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
-#endif
-#ifdef NEOPIXEL   //ota uploading indicator
-  FastLED.showColor(CHSV(HUE_BLUE, 255, 100));
-  delay(1);
-  FastLED.showColor(CHSV(HUE_BLUE, 255, 0));
-#endif
-#ifdef ONBOARDLED
-  digitalWrite(BUILD_IN_LED, !led_status); delay(1); digitalWrite(BUILD_IN_LED, led_status);  //flash when uploading
-#endif
+  #ifdef SERIAL_DEBUG
+    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+  #endif
+  #ifdef NEOPIXEL   //ota uploading indicator
+    FastLED.showColor(CHSV(HUE_BLUE, 255, 100));
+    delay(1);
+    FastLED.showColor(CHSV(HUE_BLUE, 255, 0));
+  #endif
+  #ifdef ONBOARDLED
+    digitalWrite(BUILD_IN_LED, !led_status); delay(1); digitalWrite(BUILD_IN_LED, led_status);  //flash when uploading
+  #endif
 });
 ArduinoOTA.onError([](ota_error_t error) {
-#ifdef SERIAL_DEBUG
-  Serial.printf("Error[%u]: ", error);
-  if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");                   //TODO add red led feedback
-  else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-  else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-  else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-  else if (error == OTA_END_ERROR) Serial.println("End Failed");
-#endif
+  #ifdef SERIAL_DEBUG
+    Serial.printf("Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed. Firewall Issue ?");
+    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+    else if (error == OTA_END_ERROR) Serial.println("End Failed");
+  #endif
 });
 ArduinoOTA.begin();
 Udp.begin(localPort);
 
 //-------------------------- External ADc --------------------------------------
-#ifdef GSR
+if(external_adac_present){
   #ifdef SERIAL_DEBUG
     Serial.println("Getting single-ended readings from AIN0..3");
-    Serial.println("ADC Range: +/- 6.144V (1 bit = 0.1875mV/ADS1115)");
+    Serial.println("ADC Range: +/- 6.144V (1 bit = 3mV/ADS1015, 0.1875mV/ADS1115)");
   #endif
-  ads.setGain(GAIN_TWOTHIRDS);      // 2/3x gain +/- 6.144V       0.1875mV (default)
-  ADresolution = 0.1875;
+  ads.setGain(GAIN_TWOTHIRDS);  // 2/3x gain +/- 6.144V  1 bit = 3mV      0.1875mV (default)
   ads.begin();
-#endif
+}
+
+// Serial.print("ADS? ");
+// uint32_t reg = readRegister(ADS1015_ADDRESS, ADS1015_REG_POINTER_CONFIG);
+// #if ARDUINO >= 100
+// Serial.println(reg);
+// #endif
 
 #ifdef NEOPIXEL
-FastLED.showColor(CHSV(HUE_GREEN, 255, 100));
-delay(500);
-FastLED.showColor(CHSV(HUE_GREEN, 255, 0));
+  FastLED.showColor(CHSV(HUE_GREEN, 255, 100));
+  delay(500);
+  FastLED.showColor(CHSV(HUE_GREEN, 255, 0));
 #endif
 
 #ifdef ONBOARDLED    //turn led on if connected
-led_status = 0;
-digitalWrite(BUILD_IN_LED, led_status);
+  led_status = 0;
+  digitalWrite(BUILD_IN_LED, led_status);
 #endif
 
 #ifdef STOPWATCH
@@ -282,7 +318,7 @@ void loop() {
     currentMillisReport = millis();
     if (currentMillisReport - previousMillisReport >= (report_interval)) {
       previousMillisReport = currentMillisReport;
-      sendReport();                                                               //TODO send report to diffrent port or IP, separate from server
+      sendReport();
     }
   }
 }
@@ -322,11 +358,11 @@ void AD2OSC(){
     timingMillisReference = millis(); //reset stopwatch
   #endif
 
-    if (serialPlotterEnable && Serial) {
-        Serial.print(adc_int); Serial.print(",");
-        Serial.print(sliding_min); Serial.print(",");
-        Serial.println(sliding_max);
-    }
+  if (serialPlotterEnable && Serial) {
+      Serial.print(adc_int); Serial.print(",");
+      Serial.print(sliding_min); Serial.print(",");
+      Serial.println(sliding_max);
+  }
 
   #ifdef STOPWATCH
     timingMillisRuning = millis() - timingMillisReference;
@@ -345,17 +381,17 @@ void AD2OSC(){
   Udp.endPacket();
   voltage_hr.empty();
 
-  #ifdef GSR
-    int adc_ext;    //external ADC ADS1115
-    //adc_ext = normalize(0, 16384, ads.readADC_SingleEnded(0));                    //TODO calculate resolution for ADS 1015
-    adc_ext = ads.readADC_SingleEnded(0);                    //TODO calculate resolution for ADS 1015
+  if(external_adac_present){
+    int adc_ext;    //external ADC
+    // adc_ext = map(ads.readADC_SingleEnded(0), 0, 4096, 0, 1024);             //map full ADC range (12bit - 4096) to 0-1024
+    adc_ext = ads.readADC_SingleEnded(0);                                       //GSR is giving 1200 max without maping
     OSCMessage voltage_gsr(osc_header_gsr);
     voltage_gsr.add(adc_ext);
     Udp.beginPacket(remoteIP, destPort);
     voltage_gsr.send(Udp);
     Udp.endPacket();
     voltage_gsr.empty();
-  #endif
+  }
 
   #ifdef STOPWATCH
     timingMillisRuning = millis() - timingMillisReference;
@@ -366,31 +402,31 @@ void AD2OSC(){
 }
 
 unsigned long normalize(unsigned long value_min, unsigned long value_max, unsigned long value) {
-    // ghetto callibration
-    // think of the sliding_min and sliding_max as two walls that are always closing in creating
-    // and more and more narrow hallway for the incoming value to fit in. when the value breaches
-    // those walls they are expanded by `step`. when the value is below those walls they are
-    // further enclosed by step
+  // ghetto callibration
+  // think of the sliding_min and sliding_max as two walls that are always closing in creating
+  // and more and more narrow hallway for the incoming value to fit in. when the value breaches
+  // those walls they are expanded by `step`. when the value is below those walls they are
+  // further enclosed by step
 
-    // first run (when sliding_min == -1):
-    if (sliding_min < 0) sliding_min = value_min;
-    // value is lower than expected, make floor this value:
-    else if (value < sliding_min) sliding_min = value;
-    // value is above floor, slowly move floor up:
-    else if (value > sliding_min && sliding_min+step < sliding_max) sliding_min += step;
+  // first run (when sliding_min == -1):
+  if (sliding_min < 0) sliding_min = value_min;
+  // value is lower than expected, make floor this value:
+  else if (value < sliding_min) sliding_min = value;
+  // value is above floor, slowly move floor up:
+  else if (value > sliding_min && sliding_min+step < sliding_max) sliding_min += step;
 
-    if (sliding_max < 0) sliding_max = value_max;
-    else if (value > sliding_max) sliding_max = value;
-    else if (value < sliding_max && sliding_max-step > sliding_min) sliding_max -= step;
+  if (sliding_max < 0) sliding_max = value_max;
+  else if (value > sliding_max) sliding_max = value;
+  else if (value < sliding_max && sliding_max-step > sliding_min) sliding_max -= step;
 
-    unsigned long output;
-    // this calculation assumes we want a return value between 0 and 1000. We scale using value so as to avoid any need for float point
-    output = (value-sliding_min)*1000/(sliding_max-sliding_min);
+  unsigned long output;
+  // this calculation assumes we want a return value between 0 and 1000. We scale using value so as to avoid any need for float point
+  output = (value-sliding_min)*1000/(sliding_max-sliding_min);
 
-    // if you do not want to use the sliding window calibration method then uncomment the following
-    //output = (value*1000)/(value_max-value_min);
+  // if you do not want to use the sliding window calibration method then uncomment the following
+  //output = (value*1000)/(value_max-value_min);
 
-    return output;
+  return output;
 }
 
 void led_fn(OSCMessage &msg) {
@@ -426,13 +462,13 @@ void serial_plot_fn(OSCMessage &msg){
   int onoff = msg.getInt(0);
   if (onoff != 1) {
     // == 0  disable Serial port and exit
-    serialPlotterEnable = false;
+    serialPlotterEnable = 0;
     Serial.end();
     return;
   }
   if (!Serial)
     Serial.begin(SERIAL_SPEED);
-  serialPlotterEnable = true;
+  serialPlotterEnable = 1;
 }
 
 void OSCMsgReceive(){
@@ -441,21 +477,33 @@ void OSCMsgReceive(){
   if((size = Udp.parsePacket())>0){
     while(size--)
       msgIN.fill(Udp.read());
-    if(!msgIN.hasError()){
-      msgIN.dispatch("/led", led_fn);
-      msgIN.dispatch("/interval", measurment_interval_fn);
-      msgIN.dispatch("/report", report_interval_fn);
-      msgIN.dispatch("/destination", osc_destination_fn);
-      msgIN.dispatch("/serialplot", serial_plot_fn);
-    } else {
-      error = msgIN.getError();
-      #ifdef SERIAL_DEBUG
-        Serial.print("error: ");
-        Serial.println(error);
-      #endif
-
-    }
+        if(!msgIN.hasError()){
+          msgIN.dispatch("/led", led_fn);
+          msgIN.dispatch("/interval", measurment_interval_fn);
+          msgIN.dispatch("/report", report_interval_fn);
+          msgIN.dispatch("/destination", osc_destination_fn);
+          msgIN.dispatch("/serialplot", serial_plot_fn);
+        } else {
+          error = msgIN.getError();
+          #ifdef SERIAL_DEBUG
+            Serial.print("error: ");
+            Serial.println(error);
+          #endif
+          }
   }
+}
+
+void sendOSCmessage(char* name, int value){
+  char message_osc_header[16];
+  message_osc_header[0] = {0};
+  strcat(message_osc_header, osc_header_report);
+  strcat(message_osc_header, name);
+  OSCMessage message(message_osc_header);
+  message.add(value);
+  Udp.beginPacket(remoteIP, destPort);
+  message.send(Udp);
+  Udp.endPacket();
+  message.empty();
 }
 
 void sendReport(){
@@ -466,132 +514,16 @@ void sendReport(){
     timingMillisReference = millis(); //reset stopwatch
   #endif
 
-  //rssi
-  char rssi_ch[32];                                                             //TODO build function for OSC sending message
-  rssi_ch[0] = {0};
-  int32_t RSSI = WiFi.RSSI(); //check if rssi is for current network
-  strcat(rssi_ch, osc_header_report);
-  strcat(rssi_ch, "/rssi");
-  OSCMessage rssi(rssi_ch);
-  rssi.add(RSSI);
-  Udp.beginPacket(remoteIP, destPort);
-  rssi.send(Udp);
-  Udp.endPacket();
-  rssi.empty();
-
-  // running time
-  char time_ch[32];
-  time_ch[0] = {0};
-  unsigned int runningTime = millis()/1000;
-  strcat(time_ch, osc_header_report);
-  strcat(time_ch, "/time");
-  OSCMessage rtime(time_ch);
-  rtime.add(runningTime);
-  Udp.beginPacket(remoteIP, destPort);
-  rtime.send(Udp);
-  Udp.endPacket();
-  rtime.empty();
-
-  //version
-  char ver_ch[16];
-  ver_ch[0] = {0};
-  strcat(ver_ch, osc_header_report);
-  strcat(ver_ch, "/ver");
-  OSCMessage ver(ver_ch);
-  float Ver = FIRMWARE_VERSION; //silly conversion, Max MSP not happy with direct FIRMWARE_VERSION send
-  ver.add(Ver);
-  Udp.beginPacket(remoteIP, destPort);
-  ver.send(Udp);
-  Udp.endPacket();
-  ver.empty();
-
-  //channel
-  char ch_ch[16];
-  ch_ch[0] = {0};
-  strcat(ch_ch, osc_header_report);
-  strcat(ch_ch, "/channel");
-  OSCMessage channel(ch_ch);
-  channel.add(WiFi.channel());
-  Udp.beginPacket(remoteIP, destPort);
-  channel.send(Udp);
-  Udp.endPacket();
-  channel.empty();
-
-  // #ifdef GSR               // not connected yet
-  //   float adc2;
-  //   adc2 = ((ads.readADC_SingleEnded(3) * ADresolution)/1000);
-  //   char volt_ch3[8];
-  //   volt_ch3[0] = {0}; //reset buffor
-  //   strcat(volt_ch3, osc_header_report);
-  //   strcat(volt_ch3, "/lipo"); //build OSC message with unit ID
-  //   OSCMessage voltage3(volt_ch3);
-  //   voltage3.add(adc2);
-  //   Udp.beginPacket(remoteIP, destPort);
-  //   voltage3.send(Udp);
-  //   Udp.endPacket();
-  //   voltage3.empty();
-  // #endif
-
-  //led status feedback
-  char led_ch[16];
-  led_ch[0] = {0};
-  strcat(led_ch, osc_header_report);
-  strcat(led_ch, "/led");
-  OSCMessage led(led_ch);
-  led.add(led_status);
-  Udp.beginPacket(remoteIP, destPort);
-  led.send(Udp);
-  Udp.endPacket();
-  led.empty();
-
-  //AD measurment interval status feedback
-  char interval_ch[16];
-  interval_ch[0] = {0};
-  strcat(interval_ch, osc_header_report);
-  strcat(interval_ch, "/interval");
-  OSCMessage interval(interval_ch);
-  interval.add(measurment_interval);
-  Udp.beginPacket(remoteIP, destPort);
-  interval.send(Udp);
-  Udp.endPacket();
-  interval.empty();
-
-  //report interval status feedback
-  char report_ch[16];
-  report_ch[0] = {0};
-  strcat(report_ch, osc_header_report);
-  strcat(report_ch, "/report");
-  OSCMessage report(report_ch);
-  report.add(report_interval);
-  Udp.beginPacket(remoteIP, destPort);
-  report.send(Udp);
-  Udp.endPacket();
-  report.empty();
-
-  //OSC destination feedback
-  char destination_ch[16];
-  destination_ch[0] = {0};
-  strcat(destination_ch, osc_header_report);
-  strcat(destination_ch, "/destination");
-  OSCMessage osc_destination(destination_ch);
-  osc_destination.add(destination);
-  Udp.beginPacket(remoteIP, destPort);
-  osc_destination.send(Udp);
-  Udp.endPacket();
-  osc_destination.empty();
-
-  //OSC plotter feedback
-  char plotter_ch[16];
-  plotter_ch[0] = {0};
-  strcat(plotter_ch, osc_header_report);
-  strcat(plotter_ch, "/plotter");
-  OSCMessage plotter(plotter_ch);
-  plotter.add(serialPlotterEnable);
-  Udp.beginPacket(remoteIP, destPort);
-  plotter.send(Udp);
-  Udp.endPacket();
-  plotter.empty();
-
+  sendOSCmessage("/ver", firmware_version);
+  sendOSCmessage("/rssi", WiFi.RSSI());
+  sendOSCmessage("/channel", WiFi.channel());
+  sendOSCmessage("/time", (millis()/1000));               //running time in secs
+  sendOSCmessage("/plotter", serialPlotterEnable);
+  sendOSCmessage("/ext_adac", external_adac_present);
+  sendOSCmessage("/led", led_status);
+  sendOSCmessage("/report", report_interval); delay(1);    //TODO investigate why next couple of messages are droped without the delay
+  sendOSCmessage("/interval", measurment_interval);        //TODO seems to does not send, to check!
+  sendOSCmessage("/destination", destination);
 
   #ifdef STOPWATCH
     timingMillisRuning = millis() - timingMillisReference;
