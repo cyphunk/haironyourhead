@@ -27,7 +27,7 @@ do
                 echo "runnin pids: '$PIDS'"
                 test -n "$PIDS" && kill $PIDS
                 echo "Restarting node instance in background:"
-                eval nohup $CMD &>/dev/null & # need to have no stdout or err else ssh stays open
+                nohup $CMD &>/dev/null & # need to have no stdout or err else ssh stays open
                 # node server.js --runtestserver --interface ens3 server.js 2>/dev/null &
         else
                 echo "Ref $ref received. Doing nothing: only the ${BRANCH} branch may be deployed on this server."
