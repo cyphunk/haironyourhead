@@ -1,0 +1,95 @@
+<html>
+<head>
+<script src="http://hoyh.nocompany.co/socket.io/socket.io.js"></script>
+
+<script>
+    console.log('it may take a few seconds for the first connection')
+
+    // localStorage.debug='*';
+    localStorage.debug='';
+
+    var socket = io.connect('http://hoyh.nocompany.co');
+
+    var show_info = {}
+    /* On server defined as:
+    {
+        name: show.name,
+        timebegin: show.timebegin,
+        device_ids: Object.keys(show.devices),
+        beats_total: show_beats_total,
+        beats_valid: show_beats_valid,
+        beats_valid_sum: show_beats_valid_sum,
+        bpm_avg: show_beats_valid_sum/show_beats_valid,
+        options: show.options
+    }
+    */
+
+    socket.emit('init');
+
+    socket.on('connect', function () {
+        console.log('### connected')
+
+        socket.emit('get_show_info') // results in a show_info message from srv
+
+    });
+
+    socket.on('show_info', function (data){
+        console.log('### show_info')
+        console.log(data)
+        show_info = data
+
+        quickDemo();
+
+    });
+
+    socket.on('samples', function(data){
+        console.log('### samples')
+        console.log(data)
+    }); // result of get_samples message from client
+
+
+    function quickDemo() {
+        // I'm using timeouts only so that the response from the server will show up
+        // in a useful order in console
+        if (!show_info.hasOwnProperty('device_ids') || show_info.device_ids.length<=0) {
+            console.log('no devices broadcasting to server?')
+        }
+        else {
+            window.setTimeout(function() {
+                var device_id = show_info.device_ids[0]
+                console.log('request last 3 seconds of samples from device id:', device_id)
+                var start_time = new Date().getTime() - (3*1000)
+                socket.emit('get_samples', device_id, start_time)
+            },4000)
+
+            window.setTimeout(function() {
+                console.log('request a 1 second slice from the past, from all devices')
+                var end_time = new Date().getTime() - (3*1000)
+                var start_time = end_time - (2*1000)
+                socket.emit('get_samples', null, start_time, end_time)
+            },6000)
+
+            window.setTimeout(function() {
+                var device_id = show_info.device_ids[0]
+                console.log('request all samples for device id:', device_id)
+                socket.emit('get_samples', device_id)
+            },8000)
+
+        }
+    }
+
+    console.log("set graph() to run now and once every 10 seconds")
+    graph()
+    window.setInterval(graph, 10000)
+
+
+    function graph() {
+
+    }
+</script>
+
+</head>
+<body>
+look at the source code and open the javascript console
+</body>
+</html>
