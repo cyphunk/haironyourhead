@@ -169,14 +169,14 @@
 
     // debug function puts the devices data structure in the HTML page so that
     // it can be copy+pasted
-    function printdevices() {
+    function printobject(obj) {
         var d = document.getElementById('data')
         if (!d) {
             d = document.createElement('div')
             d.id = 'data'
             document.getElementsByTagName('body')[0].appendChild(d)
         }
-        d.innerHTML = '<pre>'+JSON.stringify(devices,null,2)+'</pre>'
+        d.innerHTML = '<pre>'+JSON.stringify(obj,null,2)+'</pre>'
     }
 </script>
 
