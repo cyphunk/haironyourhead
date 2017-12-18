@@ -15,9 +15,15 @@ do
         then
                 echo "Ref $ref received. Deploying ${BRANCH} branch to production..."
                 git --work-tree=$TRAGET --git-dir=$GIT_DIR checkout -f
-                echo "Restarting node service:"
-                whoami
-                pwd
+                echo "user: `whoami`"
+                echo "directory: `pwd`"
+                cd ../live/server
+                echo "Install node_modules"
+                npm install
+                echo "Stop other server instances:"
+
+                echo "Restarting node instance:"
+                node server.js --runtestserver --interface ens3 server.js &
         else
                 echo "Ref $ref received. Doing nothing: only the ${BRANCH} branch may be deployed on this server."
         fi
