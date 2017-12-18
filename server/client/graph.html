@@ -63,7 +63,7 @@
             bpm_data[data.id] = [];
 
         if (typeof data.bpm === 'object') { // assume array
-            bpm_data[data.id].push({date:data.bpm[1], close:data.bpm[0]})
+            bpm_data[data.id].push({date:data.bpm[0], close:data.bpm[1]})
         }
         else {
             var d = new Date()
