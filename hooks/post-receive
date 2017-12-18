@@ -15,7 +15,7 @@ do
         then
                 echo "Ref $ref received. Deploying ${BRANCH} branch to production..."
                 git --work-tree=$TRAGET --git-dir=$GIT_DIR checkout -f
-                echo "Restarting node service:"
+                echo "Restarting node service: "
                 whoami
                 pwd
         else
