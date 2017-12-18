@@ -15,12 +15,10 @@ do
         then
                 echo "Ref $ref received. Deploying ${BRANCH} branch to production..."
                 git --work-tree=$TRAGET --git-dir=$GIT_DIR checkout -f
+                echo "Restarting node service"
+                whoami
+                pwd
         else
                 echo "Ref $ref received. Doing nothing: only the ${BRANCH} branch may be deployed on this server."
         fi
 done
-
-
-echo "Restarting node service"
-whoami
-pwd
