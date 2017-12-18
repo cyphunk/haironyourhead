@@ -18,12 +18,16 @@ do
                 echo "user: `whoami`"
                 echo "directory: `pwd`"
                 cd ../live/server
+                echo "directory: `pwd`"
                 echo "Install node_modules"
                 npm install
                 echo "Stop other server instances:"
-
+                CMD="node server.js --runtestserver --interface ens3 server.js"
+                /bin/ps aux | grep "$CMD" | grep -v grep | awk '{print $2}' \
+                 | xargs kill
                 echo "Restarting node instance:"
-                node server.js --runtestserver --interface ens3 server.js &
+                eval $CMD 2>/dev/null &
+                # node server.js --runtestserver --interface ens3 server.js 2>/dev/null &
         else
                 echo "Ref $ref received. Doing nothing: only the ${BRANCH} branch may be deployed on this server."
         fi
