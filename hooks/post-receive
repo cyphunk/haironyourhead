@@ -23,7 +23,8 @@ do
                 npm install
                 echo "Stop other server instances:"
                 CMD="node server.js --runtestserver --interface ens3 server.js"
-                PIDS=$(/bin/ps aux | grep "$CMD" | grep -v grep | awk '{print $2}' | xargs) \
+                PIDS=$(/bin/ps aux | grep "$CMD" | grep -v grep | awk '{print $2}' | xargs)
+                echo "runnin pids: '$PIDS'"
                 test -n "$PIDS" && kill $PIDS
                 echo "Restarting node instance in background:"
                 eval nohup $CMD &
