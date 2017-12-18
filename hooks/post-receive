@@ -23,10 +23,10 @@ do
                 npm install
                 echo "Stop other server instances:"
                 CMD="node server.js --runtestserver --interface ens3 server.js"
-                /bin/ps aux | grep "$CMD" | grep -v grep | awk '{print $2}' \
-                 | xargs kill
-                echo "Restarting node instance:"
-                eval $CMD 2>/dev/null &
+                PIDS=$(/bin/ps aux | grep "$CMD" | grep -v grep | awk '{print $2}' | xargs) \
+                test -n "$PIDS" && kill $PIDS
+                echo "Restarting node instance in background:"
+                eval nohup $CMD &
                 # node server.js --runtestserver --interface ens3 server.js 2>/dev/null &
         else
                 echo "Ref $ref received. Doing nothing: only the ${BRANCH} branch may be deployed on this server."
