@@ -1,7 +1,7 @@
 <html>
 <head>
-    <!-- <script src="http://hoyh.nocompany.co/socket.io/socket.io.js"></script> -->
-    <script src="/socket.io/socket.io.js"></script>
+    <script src="http://hoyh.nocompany.co/socket.io/socket.io.js"></script>
+    <!-- <script src="/socket.io/socket.io.js"></script> -->
 
 <script>
     console.log('it may take a few seconds for the first connection')
@@ -9,8 +9,8 @@
     // localStorage.debug='*';
     localStorage.debug='';
 
-    // var socket = io.connect('http://hoyh.nocompany.co');
-    var socket = io.connect('');
+    var socket = io.connect('http://hoyh.nocompany.co');
+    // var socket = io.connect('');
 
     var show_info = {}
     /* On server defined as:
@@ -100,7 +100,7 @@
     var tensec = {}
     var tensec_width_ms = 10000; /*10secod window*/
     function generate_spread(device_id=null, /*null means all*/
-                             start_time_ms=0, /* use this to calculate for all or only samples > this time */
+                             start_time_ms=0 /* use this to calculate for all or only samples > this time */
                              ) {
         if (!device_id)
             var device_ids = Object.keys(devices)
