@@ -255,7 +255,7 @@ app.use('/', express.static(__dirname + '/client'));
 // });
 if (runtestserver) {
     app.use('/runtest', (req, res) => {
-        exec('/bin/ps aux | grep osc_record_replay.py | grep -v grep | wc -l', (err, stdout, stderr) => {
+        exec('/bin/ps aux | grep osc_record_replay.py | grep timeout | grep -v grep | wc -l', (err, stdout, stderr) => {
           console.log(`stdou: ${stdout}`);
           console.log(`stderr: ${stderr}`);
           if (stdout && parseInt(stdout) > 0) {
