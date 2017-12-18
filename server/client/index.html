@@ -1,6 +1,7 @@
 <html>
 <head>
-<script src="http://hoyh.nocompany.co/socket.io/socket.io.js"></script>
+    <!-- <script src="http://hoyh.nocompany.co/socket.io/socket.io.js"></script> -->
+    <script src="/socket.io/socket.io.js"></script>
 
 <script>
     console.log('it may take a few seconds for the first connection')
@@ -8,7 +9,8 @@
     // localStorage.debug='*';
     localStorage.debug='';
 
-    var socket = io.connect('http://hoyh.nocompany.co');
+    // var socket = io.connect('http://hoyh.nocompany.co');
+    var socket = io.connect('');
 
     var show_info = {}
     /* On server defined as:
@@ -42,9 +44,22 @@
 
     });
 
+    // this data structure will hold our device data
+    devices = {}
+
+    // this version merges the new data
     socket.on('samples', function(data){
         console.log('### samples')
         console.log(data)
+    	// we assume all data is new and there is no overlap
+    	Object.keys(data).forEach(function(k) {
+            if (!devices.hasOwnProperty(k)) {
+                devices[k] = data[k]
+            }
+            else {
+        		devices[k].bpm.samples = devices[k].bpm.samples.concat(data[k].bpm.samples)
+            }
+    	});
     }); // result of get_samples message from client
 
 
@@ -60,22 +75,108 @@
                 console.log('request last 3 seconds of samples from device id:', device_id)
                 var start_time = new Date().getTime() - (3*1000)
                 socket.emit('get_samples', device_id, start_time)
-            },4000)
+            }, 4000)
 
             window.setTimeout(function() {
                 console.log('request a 1 second slice from the past, from all devices')
                 var end_time = new Date().getTime() - (3*1000)
                 var start_time = end_time - (2*1000)
                 socket.emit('get_samples', null, start_time, end_time)
-            },6000)
+            }, 6000)
 
             window.setTimeout(function() {
                 var device_id = show_info.device_ids[0]
                 console.log('request all samples for device id:', device_id)
                 socket.emit('get_samples', device_id)
-            },8000)
+            }, 8000)
+
 
         }
+    }
+
+    // these functions handle generating a new data strcutre that contains
+    // low/avg/high every 10 seconds
+
+    var tensec = {}
+    var tensec_width_ms = 10000; /*10secod window*/
+    function generate_spread(device_id=null, /*null means all*/
+                             start_time_ms=0, /* use this to calculate for all or only samples > this time */
+                             ) {
+        if (!device_id)
+            var device_ids = Object.keys(devices)
+        else
+            var device_ids = [device_id]
+        console.log('tensec device_ids:', device_ids)
+        device_ids.forEach(function(k){
+            console.log('tensec begin k:',k)
+            // handle condition where tensec[] first initialized
+            // initialize tensec
+            // set our prev_ms 10sec window iterator to 0 to first entry
+            //   for this key indevices
+            if (!tensec.hasOwnProperty(k)) {
+                tensec[k] = { bpm: { samples: [] }}
+                var prev_ms = devices[k].bpm.samples[0][0]
+            }
+            // this is being run after being run before, so set prev_ms to last entry
+            else if (tensec[k].bpm.samples.length > 0) {
+                var prev_ms = tensec[k].bpm.samples[tensec[k].bpm.samples.length-1][0] + tensec_width_ms
+            }
+            // this comes if for some reason we initialized but didn't have enough samples
+            // to fill in one samples entry:
+            else {
+                console.log('hmm. not much data?', k)
+            }
+
+            // temporary values
+            var sum = 0
+            var count = 0
+            var low = null
+            var high = null
+            devices[k].bpm.samples.forEach(function(entry){
+                console.log('1sec entry',k,entry,prev_ms,prev_ms+tensec_width_ms)
+
+                // sample out of bounds? to early
+                if (entry[0] < prev_ms)
+                    return;
+
+                // console.log(entry[0]/1000,'>=',prev_ms/1000)
+
+                sum += entry[1]
+                count += 1
+                if (!high || entry[1] > high)
+                    high = entry[1]
+                if (!low || entry[1] < low)
+                    low = entry[1]
+
+                // hit the edge so do the calculations
+                if (entry[0] >= prev_ms+tensec_width_ms) {
+                    console.log('add 10sec entry:', prev_ms, '- low:', low, 'avg:', parseInt(sum/count), 'high:', high)
+                    tensec[k].bpm.samples.push([prev_ms,low,sum/count,high])
+                    prev_ms = prev_ms+tensec_width_ms
+                    low = null
+                    high = null
+                    sum = 0
+                    count = 0
+                }
+                else {
+                    // console.log(entry[0]/1000,'!>=',(prev_ms+tensec_width_ms)/1000)
+                }
+            })
+        })
+    }
+
+
+
+    // debug function puts the devices data structure in the HTML page so that
+    // it can be copy+pasted
+    function printdevices() {
+        var d = document.getElementById('data')
+        if (!d) {
+            d = document.createElement('div')
+            d.id = 'data'
+            document.getElementsByTagName('body')[0].appendChild(d)
+        }
+        d.innerHTML = '<pre>'+JSON.stringify(devices,null,2)+'</pre>'
     }
 </script>
 
