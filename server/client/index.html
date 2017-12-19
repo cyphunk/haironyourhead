@@ -39,7 +39,6 @@
         show_info = data
 
         quickDemo();
-
     });
 
     // this data structure will hold our device data
@@ -88,6 +87,11 @@
                 socket.emit('get_samples', device_id)
             }, 8000)
 
+            window.setTimeout(function() {
+                var device_id = show_info.device_ids[0]
+                console.log('request all samples for device id:', device_id)
+                socket.emit('get_samples', null, 'latest')
+            }, 8000)
 
         }
     }

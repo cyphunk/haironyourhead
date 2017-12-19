@@ -179,15 +179,25 @@ io.sockets.on('connection', function(socket) {
 
         // assume we want all samples:
         device_ids.forEach(function(id) {
+            if (!show.devices.hasOwnProperty(id))
+                return
+            // ALL SAMPLES
             if (!start_time && !end_time) {
                 // omg socket.io can't handle passing back assoc array with keys
                 // that are strNum
                 ret['dev_'+id] = { id: ''+id,
-                            test: 'test',
-                            bpm: { samples: show.devices[id].bpm.samples },
-                            // gsr: { samples: show.devices[id].gsr.samples } }
+                                   bpm: { samples: show.devices[id].bpm.samples },
+                                   // gsr: { samples: show.devices[id].gsr.samples } }
+                                 }
+            }
+            // ONLY LAST SAMPLE for each
+            else if (start_time = 'latest') {
+                ret['dev_'+id] = { id: ''+id,
+                                   bpm: { samples: [show.devices[id].bpm.samples[show.devices[id].bpm.samples.length-1]] },
+                                  // gsr: { samples: show.devices[id].gsr.samples.filter(filter) } }
                           }
             }
+            // SAMPLES BETWEEN RANGE
             else {
                 var filter = function(entry) {
                     if (start_time && entry[0] < start_time) return false;
@@ -197,10 +207,9 @@ io.sockets.on('connection', function(socket) {
                 // omg socket.io can't handle passing back assoc array with keys
                 // that are strNum
                 ret['dev_'+id] = { id: ''+id,
-                    test: 'test',
-                            bpm: { samples: show.devices[id].bpm.samples.filter(filter) },
-                            // gsr: { samples: show.devices[id].gsr.samples.filter(filter) } }
-                          }
+                                   bpm: { samples: show.devices[id].bpm.samples.filter(filter) },
+                                   // gsr: { samples: show.devices[id].gsr.samples.filter(filter) } }
+                                 }
             }
         });
 

@@ -59,6 +59,7 @@
         // } catch(e){console.log(e)}
     });
     socket.on('update_global_graphs', function(data) {
+        console.log('.')
         if (!bpm_data.hasOwnProperty(data.id))
             bpm_data[data.id] = [];
 
