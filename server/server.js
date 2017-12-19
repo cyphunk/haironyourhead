@@ -179,7 +179,7 @@ io.sockets.on('connection', function(socket) {
 
         // assume we want all samples:
         device_ids.forEach(function(id) {
-            if (!show.devices.hasOwnProperty(id))
+            if (!show.devices.hasOwnProperty(id) || !show.devices[id].hasOwnProperty('bpm') ||  !show.devices[id].bpm.hasOwnProperty('samples') )
                 return
             // ALL SAMPLES
             if (!start_time && !end_time) {
