@@ -259,16 +259,20 @@ if (runtestserver) {
           console.log(`stdou: ${stdout}`);
           console.log(`stderr: ${stderr}`);
           if (stdout && parseInt(stdout) > 0) {
-              res.send(`Test streams already running: ${stdout}`);
+              res.send(`Test streams already running: ${stdout}<br><br><a href="/runtestend">stop streams</a>`);
           }
           else {
-              res.send(`Test streams already running: 0<br><a href="/runtestbegin">start streams</a>`);
+              res.send(`Test streams already running: 0<br><br><a href="/runtestbegin">start streams</a> for 20 minutes`);
           }
         });
 
     });
     app.use('/runtestbegin', (req, res) => {
         exec('cd ./test/osc_player/ && timeout 20m ./run4.sh >/dev/null &', (err, stdout, stderr) => {});
+        res.redirect('back');
+    });
+    app.use('/runtestend', (req, res) => {
+        exec("/bin/ps aux | grep osc_record_replay.py | grep -v grep | awk '{print $2}' | xargs kill", (err, stdout, stderr) => {});
         res.redirect('back');
     });
 }

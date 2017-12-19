@@ -26,13 +26,11 @@
     }
     */
 
-    socket.emit('init');
 
     socket.on('connect', function () {
         console.log('### connected')
 
         socket.emit('get_show_info') // results in a show_info message from srv
-
     });
 
     socket.on('show_info', function (data){
