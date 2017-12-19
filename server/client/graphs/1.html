@@ -184,15 +184,7 @@ function control_toggle() {
     <button onclick="socket.emit('subscribe_to_device_graph',document.getElementById('device_id').value);kagi_stop()">subscribe_to_device_graph</button><br>
     <button onclick="socket.emit('subscribe_to_global_graphs');kagi_start(document.getElementById('device_id').value);">subscribe_to_global_graphs</button><br/>
     <button onclick="socket.emit('unsubscribe');kagi_stop()">unsubscribe</button><br/>
-</td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td><td valign=top>
-    <button onclick="osc_led(document.getElementById('device_id').value,0);">on</button><button onclick="osc_led(document.getElementById('device_id').value,1);">off</button> led<br/>
-    <button onclick="osc_report(document.getElementById('device_id').value,0);">on</button><button onclick="osc_report(document.getElementById('device_id').value,1);">off</button> report<br/>
-    <button onclick="osc_serialplot(document.getElementById('device_id').value,1);">on</button><button onclick="osc_serialplot(document.getElementById('device_id').value,0);">off</button> serial plot<br/>
-</td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td><td valign=top>
-    <button onclick="osc_interval(document.getElementById('device_id').value,document.getElementById('interval').value);">interval</button><input id=interval size=4> ms, 50<br/>
-    <button onclick="osc_destination(document.getElementById('device_id').value,document.getElementById('destination').value);">destination</button><input id=destination size=3><br/>
-    <select id=debug size=2><option value=0 selected>off</option><option value=1>on</option></select> console debug<br>
-</td></table>
+</table>
 </div></div>
 
 
