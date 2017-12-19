@@ -394,6 +394,12 @@ Group.prototype = {
     end: function() {
         this.timeend = new Date().getTime();
     },
+    reset: function () {
+        this.timebegin = new Date().getTime();
+
+        this.devices = {}
+        this.bpm_avg    = []
+    }
 }
 
 // util.inherits(Device, Group);

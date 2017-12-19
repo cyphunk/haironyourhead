@@ -275,6 +275,10 @@ if (runtestserver) {
         exec("/bin/ps aux | grep osc_record_replay.py | grep -v grep | awk '{print $2}' | xargs kill", (err, stdout, stderr) => {});
         res.redirect('back');
     });
+    app.use('/runtestcleardata', (req, res) => {
+        show.reset();
+        res.redirect('back');
+    });
 }
 
 
