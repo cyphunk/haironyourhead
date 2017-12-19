@@ -259,10 +259,10 @@ if (runtestserver) {
           console.log(`stdou: ${stdout}`);
           console.log(`stderr: ${stderr}`);
           if (stdout && parseInt(stdout) > 0) {
-              res.send(`Test streams already running: ${stdout}<br><br><a href="/runtestend">stop streams</a>`);
+              res.send(`Test streams already running: ${stdout}<br><br><a href="/runtestend">stop streams</a><br><br><a href="/runtestcleardata">reset show data</a>`);
           }
           else {
-              res.send(`Test streams already running: 0<br><br><a href="/runtestbegin">start streams</a> for 20 minutes`);
+              res.send(`Test streams already running: 0<br><br><a href="/runtestbegin">start streams</a> for 20 minutes<br><br><a href="/runtestcleardata">reset show data</a>`);
           }
         });
 
