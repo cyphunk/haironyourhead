@@ -184,7 +184,9 @@ function control_toggle() {
     <button onclick="socket.emit('subscribe_to_device_graph',document.getElementById('device_id').value);kagi_stop()">subscribe_to_device_graph</button><br>
     <button onclick="socket.emit('subscribe_to_global_graphs');kagi_start(document.getElementById('device_id').value);">subscribe_to_global_graphs</button><br/>
     <button onclick="socket.emit('unsubscribe');kagi_stop()">unsubscribe</button><br/>
-</table>
+</td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td><td valign=top>
+    <select id=debug size=2><option value=0 selected>off</option><option value=1>on</option></select> console debug<br>
+</td></table>
 </div></div>
 
 
