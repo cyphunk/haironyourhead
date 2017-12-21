@@ -24,7 +24,7 @@ onconnect:
 
 // EFFICIENCY IDEA:
 /*
-  isittimeyet(): check for multiplier before accessing
+  is_it_time_yet(): check for multiplier before accessing
                  use local values rather than object ? (though using object faster actually)
   BPM._calc*: use local values instead of objects?
 
@@ -33,7 +33,7 @@ onconnect:
    at the moment we have put them in the prototype
    do we need to care?
 
-  using isittimeyet(2) and then isittimeyet(1) may get called twice
+  using is_it_time_yet(2) and then is_it_time_yet(1) may get called twice
 
   if OSC provides timestamp already maybe better to grap that in the pulse
   functions rather than always calling Date to define `now`
@@ -42,55 +42,25 @@ onconnect:
     faster than calculating based on beat_avg?
 */
 
-var util = require('util'); // for inheritance
-
-// DEBUG = ['bpm_detect', 'bpm_systolic', 'bpm_add', 'bpm_init']
-// DEBUG = ['beat']
-DEBUG = []
-console.debug = function() {
-    // if (DEBUG)
-    //     console.log.apply(this,arguments)
-        // console.log(Object.values(arguments).splice(1))
-}
-console.debug = function() {
-    if (DEBUG.indexOf(arguments[0])>=0)
-        console.log.apply(this,arguments)
-}
+var Timer = require('./Timer.js')
 
 
-function Timer(initial_last_ms=0, initial_wait_ms=0) {
-    this.last_ms = initial_last_ms;
-    this.wait_ms = initial_wait_ms;
-}
-Timer.prototype = {
-    isittimeyet: function(multiplier=1) {
-        var now = new Date().getTime();
-        if (now >= this.last_ms+(this.wait_ms*multiplier)) {
-            var elapsed_ms = now - this.last_ms;
-            // console.debug('isittimeyet', now, this.last_ms, this.wait_ms, multiplier)
-            // console.debug('now >= this.last_ms+(this.wait_ms*multiplier)')
-            // console.debug(now,'>=',this.last_ms,'+(',this.wait_ms,'*',multiplier,')',)
-            // console.debug('elapsed_ms = now - this.last_ms');
-            // console.debug(elapsed_ms,' = ',now,' - ',this.last_ms)
-            this.last_ms = now;
-            return elapsed_ms;
-        }
-        else {
-            return false;
-        }
+DEBUG = [
+    'beat',
+    // 'show_bpm',
+    // 'bpm_detect',
+    // 'bpm_systolic',
+    // 'bpm_add',
+    // 'bpm_init'
+]
+
+if (DEBUG.length > 0 && process.stdin.isTTY)
+    console.debug = function() {
+        if (DEBUG.indexOf(arguments[0])>=0)
+            console.log.apply(this,arguments)
     }
-}
-
-
-function GSR(id, samples_per_second, store_window_seconds) {
-}
-GSR.prototype = {
-    append: function(){
-    },
-}
-
-
-
+else
+    console.debug = function(){}
 
 
 function Pulse(id, samples_per_second, options) {
@@ -98,34 +68,31 @@ function Pulse(id, samples_per_second, options) {
     this.options    = options;
     this.samples_ps = samples_per_second   || 10; // low res
 
-    this.samples_start_time = new Date().getTime();
     this.samples = [];
 
-    this.samples_record_timer = new Timer()
-    this.samples_record_timer.wait_ms = 1000 / this.samples_ps;
-    this.samples_record_timer.last_ms = this.samples_start_time;
+    this.samples_record_timer = new Timer(1000 / this.samples_ps /* wait_for_ms */ )
 }
 Pulse.prototype = {
     append: function(value){
         // first sample
         if (this.samples.length === 0) {
-            var now = new Date().getTime();
             this.samples.push(value)
-            this.samples_record_timer.last_ms = now;
+            this.samples_record_timer.start_now();
         }
         // If more than two cycles have passed it indicates a large gap to fill
-        else if (elapsed_ms = this.samples_record_timer.isittimeyet(2)) {
-            var n_missing  = parseInt(elapsed_ms / this.samples_record_timer.wait_ms);
+        else if (elapsed_ms = this.samples_record_timer.is_it_time_yet(2)) {
+            // how many samples are missing that we need to fill in for?
+            var n_samples_missing  = parseInt(elapsed_ms / this.samples_record_timer.wait_for_ms);
             if (this.options.null_on_fail) {
-                this.samples.concat( Array(n_missing-1).fill(0) )
+                this.samples.concat( Array(n_samples_missing-1).fill(0) )
                 this.samples.push(value)
             }
             else {
-                this.samples.concat( Array(n_missing).fill(value) )
+                this.samples.concat( Array(n_samples_missing).fill(value) )
             }
         }
         // if one cycle has passed, record a sample
-        else if (this.samples_record_timer.isittimeyet()) {
+        else if (this.samples_record_timer.is_it_time_yet()) {
             this.samples.push(value)
         }
         // assume data is coming in live and never store time stamps
@@ -169,8 +136,7 @@ function BPM(id, samples_per_second, options, on_beat_cb) {
 
     // timer used to know when we should record current BPM (`this.bpm_avg`)
     // into `this.samples`
-    this.samples_record_timer = new Timer();
-    this.samples_record_timer.wait_ms = 1000 / this.samples_ps;
+    this.samples_record_timer = new Timer(1000 / this.samples_ps /* wait_for_ms */ );
 
     // Toggle for beat peak detection
     // true to look for beat, false to wait for systolic peak to pass:
@@ -186,10 +152,8 @@ function BPM(id, samples_per_second, options, on_beat_cb) {
     this.options.systolic_min_ms      = ((60/options.bpm_max)*1000)*options.systolic_width
 
     // this timer is used to wait for systolic time to pass
-    this.systolic_timer = new Timer();
-    //                              vv beat width in ms vv  will change when `bpm_avg`
-    this.systolic_timer.wait_ms = ((60/options.bpm_min)*1000) * options.systolic_width;
-    this.systolic_timer.last_ms = 0
+    //                                 vv beat width in ms vv  will change when `bpm_avg`
+    this.systolic_timer = new Timer( ((60/options.bpm_min)*1000) * options.systolic_width );
 
     // toggle for no beat / beat floor detection
     // true set after systolic peak passed so we know now to wait for low pulse
@@ -200,8 +164,13 @@ function BPM(id, samples_per_second, options, on_beat_cb) {
     // beat by setting `_waitingforbeatpeak = true`
     this.options.diastolic_roof_value = options.pulse_max*options.diastolic_roof
 
-    console.debug('bpm_init', 'samples_record_timer:', this.samples_record_timer.wait_ms, this.samples_record_timer.last_ms, '(wait_ms last_ms)')
-    console.debug('bpm_init', 'systolic_timer:', this.systolic_timer.wait_ms, this.systolic_timer.last_ms, '(wait_ms last_ms)')
+    // spread record is 10 second window recorder
+    this.spread_record_timer = new Timer(10000); // once every 10 seconds
+    this.spread_buffer = []
+    this.spread = []
+
+    console.debug('bpm_init', 'samples_record_timer:', this.samples_record_timer.wait_for_ms, this.samples_record_timer.last_ms, '(wait_ms last_ms)')
+    console.debug('bpm_init', 'systolic_timer:', this.systolic_timer.wait_for_ms, this.systolic_timer.last_ms, '(wait_ms last_ms)')
     console.debug('bpm_init', 'systolic:', this.options.systolic_min_ms, this.options.systolic_max_ms, '(systolic_min_ms systolic_max_ms)')
 }
 BPM.prototype = {
@@ -229,7 +198,7 @@ BPM.prototype = {
                                        ms <= this.options.systolic_max_ms; },
     calc_systolic_wait_ms: function () {
         var ms = ((60/this.bpm_avg)*1000) * this.options.systolic_width;
-        console.debug('bpm_systolic',ms,this.bpm_avg,this.systolic_timer.wait_ms,'(ms bpm_avg wait_ms)')
+        console.debug('bpm_systolic',ms,this.bpm_avg,this.systolic_timer.wait_for_ms,'(ms bpm_avg wait_ms)')
         if (!this.systolic_wait_ms_valid(ms))
             return this.options.systolic_min_ms;
         console.debug('bpm_systolic', 'valid')
@@ -246,15 +215,15 @@ BPM.prototype = {
             return;
         }
         // If more than two cycles have passed it indicates a large gap to fill
-        else if (elapsed_ms = this.systolic_timer.isittimeyet(2)) {
-            var n_missing  = parseInt(elapsed_ms / this.systolic_timer.wait_ms);
-            console.debug(arguments[0],'n_missing', n_missing, elapsed_ms, this.systolic_timer.wait_ms)
+        else if (elapsed_ms = this.systolic_timer.is_it_time_yet(2)) {
+            var n_missing  = parseInt(elapsed_ms / this.systolic_timer.wait_for_ms);
+            console.debug(arguments[0],'n_missing', n_missing, elapsed_ms, this.systolic_timer.wait_for_ms)
             this.samples.concat( Array(n_missing-1)
                                  .fill(this.samples) )
             this.samples.push(value)
         }
         // if one cycle has passed, record a sample
-        else if (this.systolic_timer.isittimeyet(this)) {
+        else if (this.systolic_timer.is_it_time_yet(this)) {
             console.debug(arguments[0], '')
             this.samples.push(value)
         }
@@ -280,46 +249,47 @@ BPM.prototype = {
                 this.bpm_avg = this.calc_bpm_avg()
 
                 // update the systolic wait time for the new avg
-                this.systolic_timer.wait_ms = this.calc_systolic_wait_ms()
-                this.systolic_timer.last_ms = now
+                this.systolic_timer.set_wait_for(this.calc_systolic_wait_ms())
+                this.systolic_timer.start_at(now)
                 // Store in GPM in samples history??
 
                 // first run, always store
                 if (this.samples.length == 0) {
                     this.samples_start_time = now
                     this.samples.push([now,this.bpm_avg])
-                    this.samples_record_timer.last_ms = now
+                    this.samples_record_timer.start_at(now)
                 }
                 // not first but way too much time passed, fill in gap
-                else if (elapsed_ms = this.samples_record_timer.isittimeyet(2)) {
-                    console.debug('bpm_detect', 'too much time elapsed :', this.samples_record_timer.wait_ms*2 , '(wait_ms*2)')
+                else if (elapsed_ms = this.samples_record_timer.is_it_time_yet(2)) {
+                    console.debug('bpm_detect', 'too much time elapsed :', this.samples_record_timer.wait_for_ms*2 , '(wait_ms*2)')
                     // too long has passed, fill in
-                    var n_missing  = parseInt(elapsed_ms / this.samples_record_timer.wait_ms);
+                    var n_missing  = parseInt(elapsed_ms / this.samples_record_timer.wait_for_ms);
                     console.debug('bpm_detect',n_missing,this.samples)
                     if (this.options.null_on_fail) {
                         for (i=n_missing-1;i>0;i--)
-                            this.samples.push([now-(this.samples_record_timer.wait_ms*i),0])
+                            this.samples.push([now-(this.samples_record_timer.wait_for_ms*i),0])
                         this.samples.push([now,this.bpm_avg])
                     }
                     else {
                         for (i=n_missing-1;i>=0;i--)
-                            this.samples.push([now-(this.samples_record_timer.wait_ms*i),this.bpm_avg])
+                            this.samples.push([now-(this.samples_record_timer.wait_for_ms*i),this.bpm_avg])
                     }
                 }
-                else if (elapsed_ms = this.samples_record_timer.isittimeyet()) {
-                    console.debug('bpm_detect','enough time elapsed :', this.samples_record_timer.wait_ms, '(wait_ms)')
+                else if (elapsed_ms = this.samples_record_timer.is_it_time_yet()) {
+                    console.debug('bpm_detect','enough time elapsed :', this.samples_record_timer.wait_for_ms, '(wait_ms)')
                     this.samples.push([now,this.bpm_avg])
                 }
 
-
+                // Let parents do something?
+                // CALLBACK
                 if (typeof this.on_beat_cb === 'function') {
                     this.on_beat_cb({id: this.id, bpm: [now, this.bpm_avg]})
                 }
             }
         }
-        else if (this._waitingforbeatfloor || this.systolic_timer.isittimeyet() ) {
+        else if (this._waitingforbeatfloor || this.systolic_timer.is_it_time_yet() ) {
             if (!this._waitingforbeatfloor)
-                console.debug('bpm_detect', 'passed systolic_time, look for floor:', this.systolic_timer.wait_ms, this.options.diastolic_roof_value, '(wait_ms diastolic_roof_value)')
+                console.debug('bpm_detect', 'passed systolic_time, look for floor:', this.systolic_timer.wait_for_ms, this.options.diastolic_roof_value, '(wait_ms diastolic_roof_value)')
             else
                 console.debug('bpm_detect','look for floor:',  this.options.diastolic_roof_value, '(diastolic_roof_value)')
 
@@ -365,11 +335,12 @@ var default_options = {
         bpm_min: 40,
         bpm_max: 220,
         bpm_window_size: 6,
-        null_on_fail: false
+        null_on_fail: false,
     },
     pulse: {
         null_on_fail: true
-    }
+    },
+    update_group_info_on_beat: true, // false for efficiency
 }
 
 
@@ -377,13 +348,16 @@ function Group(name, options) {
     this.name       = name || new Date().toISOString();
     this.options    = Object.assign({}, default_options, options);
 
-    this.timebegin = new Date().getTime();
-    this.timeend = null;
+    this.timebegin  = new Date().getTime();
+    this.timeend    = null;
 
     this.on_beat_cb = function(d){console.log('on_beat_cb',d)};
 
     this.devices    = {};
     this.bpm_avg    = [];
+
+    this.total_beats_count = 0;
+    this.total_beats_sum = 0;
 
 }
 Group.prototype = {
@@ -398,11 +372,43 @@ Group.prototype = {
         this.timebegin = new Date().getTime();
 
         this.devices = {}
-        this.bpm_avg    = []
+        this.bpm_avg = []
+    },
+    update_total_bpm_info: function (bpm) {
+        // THIS here is in the cb context (BPM object)
+        console.debug('show_bpm', 'data',bpm ,this.options.update_group_info_on_beat)
+        if (this.options.update_group_info_on_beat
+            && bpm > 0) {
+            // this too is not in Group context
+            this.total_beats_count += 1
+            this.total_beats_sum += bpm
+            console.debug('show_bpm', 'update', this.total_beats_sum, this.total_beats_sum )
+        }
+    },
+    get_info: function () {
+        return {
+            total_beats_count: this.total_beats_count,
+            total_beats_sum: this.total_beats_sum,
+            total_bpm_avg: this.total_beats_sum/this.total_beats_count
+        }
+    },
+    get_bpm_last: function (device_id) {
+        if (device_id && this.devices.hasOwnProperty(device_id)) {
+            var len = this.devices[device_id].bpm.samples.length
+            var sample = this.devices[device_id].bpm.samples[len-1]
+            return { device_id: { bpm: { samples: [ sample ] } } }
+        }
+        else {
+            var devices = {}
+            Object.keys(this.devices).forEach(function(device_id) {
+                var len = this.devices[device_id].bpm.samples.length
+                var sample = this.devices[device_id].bpm.samples[len-1]
+                devices[device_id] = { bpm: { samples: [ sample ]} }
+            })
+            return devices;
+        }
     }
 }
 
-// util.inherits(Device, Group);
-// util.inherits(BPM, Group);
 
 module.exports = Group;

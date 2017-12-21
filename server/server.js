@@ -24,9 +24,13 @@
     python3 osc_record_replay.py ./nathan.csv 9999 replay localhost
 
  */
+var Timer      = require('./Timer.js') // simple timer to do something when N time has passed
+var Group      = require('./Group.js') // BPM, Device information storage a BPM detection
+var osc        = require('node-osc'); // used to send OSC messages from web admin to devices
+var OSCListener = require('./OSCListener.js'); // creates our OSC server to listen for pulses
+
 var os         = require('os');
 var program    = require('commander');
-const { exec } = require('child_process');
 
 program
   .option('-n, --showname <value>', '', 'test_'+(new Date().toISOString()) )
@@ -44,64 +48,36 @@ var host          = program.host;
 var ip_dev        = program.interface;
 var runtestserver = program.runtestserver;
 
-
-// ip_dev    = "lo"; // network interface to get IP address from
-
-var info_update_rate_ms = 2000;
+var send_info_every_ms = 2000;
 
 var ip_prefix = os.networkInterfaces()[ip_dev]
                   .filter(t => t['family'] === 'IPv4')
                   .pop()['address']
-                  .split('.').splice(0,3).join('.')+'.'; // "192.168.1.""
-// if just taking last doesnt work, this filter returns all ipv4 addresses to choose
-// .filter(function(t,i,a){return t['family']==='IPv4' && t.hasOwnProperty('address');})
+                  .split('.').splice(0,3).join('.')+'.';
+/*
+  if just taking last doesnt work, this filter returns all ipv4 addresses to choose
+ .filter(function(t,i,a){return t['family']==='IPv4' && t.hasOwnProperty('address');})
+*/
+
 
 console.log("starting on network interface '"+ip_dev+"' with network ip '"+ip_prefix+"'")
 console.log("http listening on host/port", host, wwwport);
 console.log("osc listening on host/port", host, oscport);
+console.log("CHECK FIREWALL");
 
 
-
-var util = require('util')
-var fs   = require('fs');
-
-if (process.stdin.isTTY) {
-    var stdin = process.openStdin();
-    stdin.setRawMode(true);
-    stdin.resume();
-    stdin.setEncoding('utf8');
-    stdin.on( 'data', function( key ){
-      if ( key === '\u0003' ) { // ctrl+c aka quit
-        setTimeout(function(){process.exit()}, PROCESS_EXIT_WAIT);
-      }
-      else if ( key === '\u0013') { // ctrl+s aka save
-          var json = JSON.stringify(show,null,4);
-            fs.writeFile(show.name+'.json', json, 'utf8',
-                function(){console.log('saved',show.name+'.json')});
-      }
-      else if ( key === '\u0014' || key === '\u001bt' ) { // ctrl+t or alt+t aka test
-        console.log(util.inspect(show, {depth:null}))
-      }
-      else {
-        console.log("unknown key: ");
-      }
-      // write the key to stdout all normal like
-      //process.stdout.write( key );
-    });
-}
-
-var Group = require('./Group.js')
 var show = new Group(showname)
-
+show.on_beat_cb = on_beat_cb
+// show.set_on_beat_cb(on_beat_cb)
 
 var express  = require('express')
 var app      = express();
 var www      = require('http').createServer(app);
 www.listen(wwwport);
 var io       = require('socket.io').listen(www);
+
 io.set('log level',0);
 
-var osc      = require('node-osc');
 
 // Apprently socket.io can't check if anyone is subscribed first, because it
 // is that stupid, and just tries to send anyway? Jesus, really I could
@@ -130,18 +106,12 @@ io.sockets.on('connection', function(socket) {
 
     if (info_handler)
         clearInterval(info_handler)
-    setInterval(function(){
-        socket.emit('update_info', { show: {
-                    beats_total: show_beats_total,
-                    beats_valid: show_beats_valid,
-                    beats_valid_sum: show_beats_valid_sum,
-                    bpm_avg: show_beats_valid_sum/show_beats_valid
-                }
-        })
-    },info_update_rate_ms)
+    info_handler = setInterval(function(){
+        socket.emit('update_info', { show: show.get_info() })
+    }, send_info_every_ms)
+
     socket.on('disconnect', function() {
         console.log('socket.io disconnected');
-
     });
 
 
@@ -160,6 +130,7 @@ io.sockets.on('connection', function(socket) {
         }
         socket.emit('show_info', info);
     });
+
     socket.on('get_samples', function(device_id,start_time,end_time) {
         console.log('socket.io<get_samples',device_id,start_time,end_time);
 
@@ -216,17 +187,17 @@ io.sockets.on('connection', function(socket) {
         console.log('ret', ret)
         socket.emit('samples',  ret);
     });
+    socket.on('osc_send', function(data) {
+        console.log('socket.io<osc_send', data);
+        var client = new osc.Client( ip_prefix+data.device_id, 8888);
+        client.send(data.path, data.value);
+    });
 
 
     socket.on('subscribe_to_device_graph', function(device_id) {
         console.log('socket.io<subscribe_to_device_graph', device_id);
-        // processOsc >> emit('')
         socket.join_exclusive('device_graph:'+device_id);
         console.log('socket.rooms', socket.manager.roomClients);
-    });
-    socket.on('get_overview', function(data) {
-        console.log('socket.io<get_overview', data);
-        // send device_overview on this socket
     });
     socket.on('subscribe_to_global_graphs', function(poll_timeout) {
         console.log('socket.io<subscribe_to_global_graphs, poll_timeout:', poll_timeout);
@@ -237,11 +208,6 @@ io.sockets.on('connection', function(socket) {
     socket.on('unsubscribe', function(data) {
         console.log('socket.io<unsubscribe');
         socket.leave_all();
-    });
-    socket.on('osc_send', function(data) {
-        console.log('socket.io<osc_send', data);
-        var client = new osc.Client( ip_prefix+data.device_id, 8888);
-        client.send(data.path, data.value);
     });
 });
 
@@ -263,6 +229,8 @@ app.use('/', express.static(__dirname + '/client'));
 //     res.send(JSON.stringify(show.devices[req.params.device_id]));
 // });
 if (runtestserver) {
+    const { exec } = require('child_process');
+
     app.use('/runtest', (req, res) => {
         exec('/bin/ps aux | grep osc_record_replay.py | grep timeout | grep -v grep | wc -l', (err, stdout, stderr) => {
           console.log(`stdou: ${stdout}`);
@@ -291,56 +259,46 @@ if (runtestserver) {
 }
 
 
-var OSCListener = require('./OSCListener.js');
 var oscserver = new OSCListener.Server(oscport);
 
 oscserver.on_message_cb = processOsc;
 oscserver.start();
 
 // call back on beat detection
-show.on_beat_cb = function (data) {
-    show_beats_total ++
+function on_beat_cb (data) {
+    // only add valid beats to our count
+    show.update_total_bpm_info(data.bpm[1])
     if (io.sockets.manager.rooms.hasOwnProperty('/global_graphs')) {
         console.log('send graph data')
         // append global info to data
-        data.show = {
-            beats_total: show_beats_total,
-            beats_valid: show_beats_valid,
-            beats_valid_sum: show_beats_valid_sum,
-            bpm_avg: show_beats_valid_sum/show_beats_valid_sum
-        }
+        data.show = show.get_info()
         io.sockets.to('global_graphs').emit('update_global_graphs', data)
     }
 }
 
-var prevtimestamp = 0;
 var graph_pkts = 0;
 var osc_pkts = 0;
 var show_beats_valid=0, show_beats_total=0, show_beats_valid_sum=0;
+var print_info_timer = new Timer(20000)
+
 function processOsc(message) {
     // console.log("osc", message);
 
-    // debug
     osc_pkts+=1;
-    print_every_ms(function(){
+
+    if (process.stdin.isTTY && print_info_timer.is_it_time_yet()) {
         console.log('pps osc:', packets_per_second(osc_pkts))
         console.log("show.devices");
         Object.keys(show.devices).forEach(function(v){
             var device=show.devices[v]
-            console.log(device.id,device.bpm.bpm_avg, device.bpm.samples.slice(device.bpm.samples.length-15), "\n",device.bpm.bpm_window.join(),"hmm")
-
-            device.bpm.samples.filter(function(item){
-                show_beats_valid_sum+=item[1];
-                if(item[1]<=0) return;
-                show_beats_valid++
-            })
-
+            console.log(device.id,device.bpm.bpm_avg)
+            console.log(device.bpm.samples.slice(device.bpm.samples.length-5))
+            console.log(device.bpm.bpm_window.join())
         });
         // total beats:
-        console.log("show total beats:",show_beats_total);
-        console.log("show average bpm:", show_beats_valid_sum/show_beats_valid);
-        // console.log("show total beats",show.devices.)
-    },10000);
+        console.log("show total beats:", show.total_beats_count);
+        console.log("show average bpm:", show.total_beats_sum/show.total_beats_sum);
+    }
 
 
     // parse message
@@ -365,11 +323,6 @@ function processOsc(message) {
         type === 'hr') {
         // ONLY HR HERE
         graph_pkts+=1;
-        // print_every_ms(function(){
-        //     console.log('pps graph:', packets_per_second(graph_pkts)) },4000);
-
-        // print_every_ms(function(){
-        //     console.log('pps device:', packets_per_second(graph_pkts)) },4000);
 
         // console.log('device_id', device_id);
         io.sockets.to('device_graph:'+device_id).emit('update_device_graph', message);
@@ -387,25 +340,6 @@ function processOsc(message) {
 
 
 
-var print_every_ms_t = null;
-function print_every_ms(/*args, ..., milliseconds */) {
-    // first (causes this to also run first call)
-    var args=Object.values(arguments);
-    var ms = args.pop();
-    var now = new Date().getTime();
-    if (!print_every_ms_t) print_every_ms_t = now-ms-1;
-
-    var callback = null;
-    if (typeof args[0] == 'function')
-        callback = args[0];
-    if (now > print_every_ms_t+ms) {
-        if (callback)
-            callback();
-        else
-            console.log(args.join(' '));
-        print_every_ms_t = now;
-    }
-}
 var pps_prev_time = new Date().getTime();
 var pps_prev_packet_total = 0;
 function packets_per_second(packets_total) {
@@ -423,32 +357,45 @@ function packets_per_second(packets_total) {
 
 
 
-var flattenObject = function(obj) {
-    if (obj === null) {
-        return null;
-    }
 
-    if (Array.isArray(obj)) {
-        var newObj = [];
-        for (var i = 0; i < obj.length; i++) {
-            if (typeof obj[i] === 'object') {
-                newObj.push(flatten(obj[i]));
-            }
-            else {
-                newObj.push(obj[i]);
-            }
-        }
-        return newObj;
-    }
 
-    var result = Object.create(obj);
-    for(var key in result) {
-        if (typeof result[key] === 'object') {
-            result[key] = flatten(result[key]);
-        }
-        else {
-            result[key] = result[key];
-        }
-    }
-    return result;
+
+
+
+
+
+
+
+/*
+
+ Terminal interface
+
+ */
+
+if (process.stdin.isTTY) {
+    var fs   = require('fs');
+    var util = require('util')
+
+    var stdin = process.openStdin();
+    stdin.setRawMode(true);
+    stdin.resume();
+    stdin.setEncoding('utf8');
+    stdin.on( 'data', function( key ){
+      if ( key === '\u0003' ) { // ctrl+c aka quit
+        setTimeout(function(){process.exit()}, PROCESS_EXIT_WAIT);
+      }
+      else if ( key === '\u0013') { // ctrl+s aka save
+          var json = JSON.stringify(show,null,4);
+            fs.writeFile(show.name+'.json', json, 'utf8',
+                function(){console.log('saved',show.name+'.json')});
+      }
+      else if ( key === '\u0014' || key === '\u001bt' ) { // ctrl+t or alt+t aka test
+        console.log(util.inspect(show, {depth:null}))
+      }
+      else {
+        console.log("unknown key: ");
+      }
+      // write the key to stdout all normal like
+      //process.stdout.write( key );
+    });
 }

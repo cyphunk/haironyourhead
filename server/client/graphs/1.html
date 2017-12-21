@@ -77,12 +77,13 @@
         }
         // console.log("update_global_graphs", now, data, bpm_data);
     });
-    var show_info = {beats_total: 0, bpm_avg: 0, beats_valid_sum:0, beats_valid:0}
+    var show_info = {}
     socket.on('update_info', function(data) {
         show_info = data.show;
-        document.getElementById('beats_total').innerText =data.show.beats_total
-        document.getElementById('bpm_avg').innerText = parseInt(data.show.bpm_avg)
-        document.getElementById('beats_sum').innerText = parseInt(data.show.beats_valid_sum)
+        // console.log('update_info', data.show.total_beats_count, data)
+        document.getElementById('beats_total').innerText = data.show.total_beats_count
+        document.getElementById('bpm_avg').innerText = parseInt(data.show.total_bpm_avg)
+        document.getElementById('beats_sum').innerText = parseInt(data.show.total_beats_sum)
     });
 
 
