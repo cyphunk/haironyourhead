@@ -1,6 +1,7 @@
 <html>
 <head>
-<script src="http://hoyh.nocompany.co/socket.io/socket.io.js"></script>
+    <script src="http://hoyh.nocompany.co/socket.io/socket.io.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
 
 <script>
     console.log('it may take a few seconds for the first connection')
@@ -8,70 +9,222 @@
     // localStorage.debug='*';
     localStorage.debug='';
 
-    // var socket = io.connect('http://hoyh.nocompany.co');
-    var socket = io.connect('');
+    if (window.location.href.indexOf('hoyh.nocompany.co')>=0)
+        var socket = io.connect('http://hoyh.nocompany.co');
+    else
+        var socket = io.connect('');
 
-    var update_every_ms = 10000
+    var show_info = {}
+    /* On server defined as:
+    {
+        name: show.name,
+        timebegin: show.timebegin,
+        device_ids: Object.keys(show.devices),
+        beats_total: show_beats_total,
+        beats_valid: show_beats_valid,
+        beats_valid_sum: show_beats_valid_sum,
+        bpm_avg: show_beats_valid_sum/show_beats_valid,
+        options: show.options
+    }
+    */
+
+
     socket.on('connect', function () {
         console.log('### connected')
-        socket.emit('get_samples', null, 'last')
-        window.setInterval(function(){
-            // 'last' returns only the last element of each devices samples array
-            socket.emit('get_samples', null, 'last')
-        }, update_every_ms)
+
+        socket.emit('get_show_info') // results in a show_info message from srv
     });
 
-    socket.on('samples', function(devices){
-        console.log('### samples')
-        console.log(devices)
-        update_device_boxes(devices)
+    socket.on('show_info', function (data){
+        console.log('### show_info', data)
+
+        show_info = data
     });
 
+    // this data structure will hold our device data
+    devices = {}
 
-    // generate table
-    // it might be good to make this dynamicly change based on number of devices available
-    var rows = 4
-    var cols = 5
-    var html = ''
-    for (var i = 1; i<=rows; i++) {
-        html += "<tr>"
-        for (var j=1; j<=cols; j++)
-            html += "<td id="+j+" class=cell></td>"
-        html += "</tr>\n"
-    }
-    var table = document.createElement('table')
-    var cells;
-    table.innerHTML = html
-    window.onload = function () {
-        document.getElementsByTagName('body')[0].appendChild(table)
-        cells = document.getElementsByClassName('cell')
-    }
-    // update table:
-    var values = {} // use this rather than DOM to track if value requires change
-    function update_device_boxes(devices) {
-        console.log('update_device_boxes')
-        Object.keys(devices).forEach(function(k) {
-            // we called get_samples 'last' which means there will always only be the last entry returned
-            if (devices[k].bpm.samples.length <= 0)
-                return
-            if (!values.hasOwnProperty(k) || devices[k].bpm.samples[0][1] != values[k])
-                values[k] = devices[k].bpm.samples[0][1]
-            else
-                return
-            console.log(k)
-            cells[k].innerText = values[k]
-        });
-    }
+    // this version merges the new data
+    socket.on('samples', function(data){
+        console.log('### samples', data)
+        show_object_in_browser(data, 'data_from_server')
+    	// we assume all data is new and there is no overlap
+    	Object.keys(data).forEach(function(k) {
+            if (!devices.hasOwnProperty(k)) {
+                devices[k] = {
+                    bpm: {
+                        samples: data[k].bpm.samples,
+                        averages: [] } }
+            }
+            else {
+        		devices[k].bpm.samples = devices[k].bpm.samples.concat(data[k].bpm.samples)
+            }
+    	});
+        show_object_in_browser(devices, 'local_devices_data_structure')
 
+    }); // result of get_samples message from client
+
+
+    socket.on('averages', function(data){
+        console.log('### averages',data)
+        show_object_in_browser(data, 'data_from_server')
+        Object.keys(data).forEach(function(k) {
+            if (!devices.hasOwnProperty(k)) {
+                devices[k] = {
+                    bpm: {
+                        samples: [],
+                        averages: data[k].bpm.averages } }
+            }
+            else {
+        		devices[k].bpm.averages = devices[k].bpm.averages.concat(data[k].bpm.averages)
+            }
+    	});
+        show_object_in_browser(devices, 'local_devices_data_structure')
+    })
+
+
+
+
+    // debug function puts the devices data structure in the HTML page so that
+    // it can be copy+pasted
+    function show_object_in_browser(obj, elemid) {
+        var d = document.getElementById(elemid)
+        d.innerHTML = '<pre>'+JSON.stringify(obj,null,2)+'</pre>'
+    }
 </script>
+
+</head>
+
+
+
+
+
+
+
+
+
+<body>
+
+<div style='position:absolute; right:0; text-align:right; opacity:0.6'>
+Samples
+<br><br>
+<script>
+function threesec_past_all () {
+    var device_id = show_info.device_ids[0]
+    console.log('request last 3 seconds of samples from device id:', device_id)
+    var start_time = new Date().getTime() - (3*1000)
+    socket.emit('get_samples', device_id, start_time)
+}
+</script>
+<button onclick="threesec_past_all()">
+    Request last 3 seconds of samples from the first device_id that is active
+</button><br>
+
 
 <script>
+function onesec_past_all () {
+    var end_time = new Date().getTime() - (3*1000)
+    var start_time = end_time - (2*1000)
+    socket.emit('get_samples', null, start_time, end_time)
+}
 </script>
-<style>
-table { width: 100%; height: 100% }
-.cell { width: 20%; height:25%; background-color: #efefef; }
-</style>
-</head>
-<body>
+<button onclick="onesec_past_all()">
+    Request a 1 second slice from past for all devices
+</button><br>
+
+<script>
+function foursec_past_all () {
+    var end_time = new Date().getTime() - 3000
+    var start_time = end_time - 18000
+    socket.emit('get_samples', null, start_time, end_time)
+}
+</script>
+<button onclick="foursec_past_all()">
+    Request a 4 second slice from past for all devices
+</button><br>
+
+
+<script>
+function request_all_one_device () {
+    var device_id = show_info.device_ids[1]
+    console.log('request all samples for device id:', device_id)
+    socket.emit('get_samples', device_id)
+}
+</script>
+<button onclick="request_all_one_device()">
+    Request all samples for second active device_id
+</button><br>
+
+<script>
+function request_last_all () {
+    socket.emit('get_samples', null, "latest")
+}
+</script>
+<button onclick="request_last_all()">
+    Request only last sample for all devices
+</button><br>
+
+<br>
+Averages
+<br><br>
+
+<script>
+function avg_threesec_past_all () {
+    var device_id = show_info.device_ids[0]
+    console.log('request last 3 seconds of Averages from device id:', device_id)
+    var start_time = new Date().getTime() - (3*1000)
+    socket.emit('get_averages', device_id, start_time)
+}
+</script>
+<button onclick="avg_threesec_past_all()">
+    Request last 3 seconds of Averages from the first device_id that is active
+</button><br>
+
+
+<script>
+function avg_onesec_past_all () {
+    var end_time = new Date().getTime() - (3*1000)
+    var start_time = end_time - (2*1000)
+    socket.emit('get_averages', null, start_time, end_time)
+}
+</script>
+<button onclick="avg_onesec_past_all()">
+    Request a 1 second slice from past for all devices
+</button><br>
+
+
+<script>
+function avg_request_all_one_device () {
+    var device_id = show_info.device_ids[1]
+    console.log('request all Averages for device id:', device_id)
+    socket.emit('get_averages', device_id)
+}
+</script>
+<button onclick="avg_request_all_one_device()">
+    Request all samples for second active device_id
+</button><br>
+
+<script>
+function avg_request_last_all () {
+    socket.emit('get_averages', null, "latest")
+}
+</script>
+<button onclick="avg_request_last_all()">
+    Request only last sample for all devices
+</button><br>
+</div>
+
+
+
+
+
+<table>
+    <td valign=top>
+        <tt>data from server:&nbsp;&nbsp;&nbsp;&nbsp;</tt><br>
+        <pre id=data_from_server style='font-size:0.75em;'></pre></td>
+    <td valign=top>
+        <tt>local `devices` data structure:</tt><br>
+        <pre id=local_devices_data_structure style='font-size:0.75em;'></pre></td>
+</table>
 </body>
 </html>

@@ -38,7 +38,7 @@ program
   .option('-w, --wwwport <n>', '', 8081)
   .option('-i, --interface <n>', 'select interface (so we know what the network IP looks like) interfaces: '+Object.keys(os.networkInterfaces()).join(), 'wlp3s0')
   .option('-t, --runtestserver', 'default: false', false)
-  .option('-w, --debug', 'default: false', false)
+  .option('-d, --debug <value>', 'default: false', false)
  .parse(process.argv);
 
 var showname      = program.showname;
@@ -47,6 +47,7 @@ var wwwport       = program.wwwport;
 var host          = program.host;
 var ip_dev        = program.interface;
 var runtestserver = program.runtestserver;
+var DEBUG         = process.debug || process.env.hasOwnProperty('DEBUG');
 
 var send_info_every_ms = 2000;
 
@@ -65,10 +66,12 @@ console.log("http listening on host/port", host, wwwport);
 console.log("osc listening on host/port", host, oscport);
 console.log("CHECK FIREWALL");
 
+var debug  = require('debug')
+var debuga = require('debug')('samples')
+var debugb = require('debug')('averages')
 
 var show = new Group(showname)
 show.on_beat_cb = on_beat_cb
-// show.set_on_beat_cb(on_beat_cb)
 
 var express  = require('express')
 var app      = express();
@@ -131,62 +134,68 @@ io.sockets.on('connection', function(socket) {
         socket.emit('show_info', info);
     });
 
-    socket.on('get_samples', function(device_id,start_time,end_time) {
-        console.log('socket.io<get_samples',device_id,start_time,end_time);
-
+    function slice_samples(array_name='samples',
+                           device_id, start_time, end_time) {
         var ret =  {};
-
-        // var device_id  = data.hasOwnProperty('device_id') ? data.device_id : null
-        // var start_time = data.hasOwnProperty('start_time') ? data.start_time : null
-        // var end_time   = data.hasOwnProperty('end_time') ? data.end_time : null
-        // var start_time = start_time ? start_time : show.timebegin
-        // var end_time   = end_time   ? end_time   : new Date().getTime()+1000;
-
         // assume all devices if no device id passed
-        if (!device_id)
-            var device_ids = Object.keys(show.devices)
-        else
-            var device_ids = [device_id]
+        var device_ids = device_id ? [device_id]
+                                   : Object.keys(show.devices)
 
         // assume we want all samples:
         device_ids.forEach(function(id) {
-            if (!show.devices.hasOwnProperty(id) || !show.devices[id].hasOwnProperty('bpm') ||  !show.devices[id].bpm.hasOwnProperty('samples') )
+            debuga('slice_samples id',id)
+
+            if (!show.devices.hasOwnProperty(id) || !show.devices[id].hasOwnProperty('bpm') ||  !show.devices[id].bpm.hasOwnProperty(array_name) )
                 return
+
             // ALL SAMPLES
+            ret[id] = { id: id, bpm: { } }
             if (!start_time && !end_time) {
                 // omg socket.io can't handle passing back assoc array with keys
                 // that are strNum
-                ret['dev_'+id] = { id: ''+id,
-                                   bpm: { samples: show.devices[id].bpm.samples },
-                                   // gsr: { samples: show.devices[id].gsr.samples } }
-                                 }
+                ret[id].bpm[array_name] = show.devices[id].bpm[array_name]
             }
             // ONLY LAST SAMPLE for each
-            else if (start_time = 'latest') {
-                ret['dev_'+id] = { id: ''+id,
-                                   bpm: { samples: [show.devices[id].bpm.samples[show.devices[id].bpm.samples.length-1]] },
-                                  // gsr: { samples: show.devices[id].gsr.samples.filter(filter) } }
-                          }
+            else if (start_time == 'latest') {
+                var last = show.devices[id].bpm[array_name].length-1
+                ret[id].bpm[array_name] = [show.devices[id].bpm[array_name][last]]
+                // gsr: { samples: show.devices[id].gsr.samples.filter(filter) } }
             }
             // SAMPLES BETWEEN RANGE
             else {
                 var filter = function(entry) {
+                    console.log('filter',entry[0],start_time)
+                    console.log('filter',entry[0],end_time)
                     if (start_time && entry[0] < start_time) return false;
                     if (end_time && entry[0] > end_time) return false;
                     return true;
                 }
                 // omg socket.io can't handle passing back assoc array with keys
                 // that are strNum
-                ret['dev_'+id] = { id: ''+id,
-                                   bpm: { samples: show.devices[id].bpm.samples.filter(filter) },
-                                   // gsr: { samples: show.devices[id].gsr.samples.filter(filter) } }
-                                 }
+                ret[id].bpm[array_name] = show.devices[id].bpm[array_name].filter(filter)
+                // gsr: { samples: show.devices[id].gsr.samples.filter(filter) } }
             }
         });
+        return ret;
 
-        console.log('ret', ret)
+    }
+    socket.on('get_samples', function(device_id,start_time,end_time) {
+        console.log('socket.io<get_samples',device_id,start_time,end_time);
+
+        var ret =  slice_samples('samples', device_id,start_time,end_time);
+        util = require('util')
+        console.log('ret', util.inspect(ret, null, 2))
         socket.emit('samples',  ret);
     });
+
+
+    socket.on('get_averages', function(device_id,start_time,end_time) {
+        console.log('socket.io<get_averages',device_id,start_time,end_time);
+        var ret =  slice_samples('averages', device_id,start_time,end_time);
+        console.log('ret', ret)
+        socket.emit('averages',  ret);
+    });
+
     socket.on('osc_send', function(data) {
         console.log('socket.io<osc_send', data);
         var client = new osc.Client( ip_prefix+data.device_id, 8888);
@@ -228,35 +237,6 @@ app.use('/', express.static(__dirname + '/client'));
 //     res.setHeader('Content-Type', 'application/json');
 //     res.send(JSON.stringify(show.devices[req.params.device_id]));
 // });
-if (runtestserver) {
-    const { exec } = require('child_process');
-
-    app.use('/runtest', (req, res) => {
-        exec('/bin/ps aux | grep osc_record_replay.py | grep timeout | grep -v grep | wc -l', (err, stdout, stderr) => {
-          console.log(`stdou: ${stdout}`);
-          console.log(`stderr: ${stderr}`);
-          if (stdout && parseInt(stdout) > 0) {
-              res.send(`Test streams already running: ${stdout}<br><br><a href="/runtestend">stop streams</a><br><br><a href="/runtestcleardata">reset show data</a>`);
-          }
-          else {
-              res.send(`Test streams already running: 0<br><br><a href="/runtestbegin">start streams</a> for 20 minutes<br><br><a href="/runtestcleardata">reset show data</a>`);
-          }
-        });
-
-    });
-    app.use('/runtestbegin', (req, res) => {
-        exec('cd ./test/osc_player/ && timeout 20m ./run4.sh >/dev/null &', (err, stdout, stderr) => {});
-        res.redirect('back');
-    });
-    app.use('/runtestend', (req, res) => {
-        exec("/bin/ps aux | grep osc_record_replay.py | grep -v grep | awk '{print $2}' | xargs kill", (err, stdout, stderr) => {});
-        res.redirect('back');
-    });
-    app.use('/runtestcleardata', (req, res) => {
-        show.reset();
-        res.redirect('back');
-    });
-}
 
 
 var oscserver = new OSCListener.Server(oscport);
@@ -268,18 +248,22 @@ oscserver.start();
 function on_beat_cb (data) {
     // only add valid beats to our count
     show.update_total_bpm_info(data.bpm[1])
+    show.update_aggregate_device(data.bpm[0]) //provide time so function doesnt need to
+    show.devices[data.id].bpm.generate_average_spread()
     if (io.sockets.manager.rooms.hasOwnProperty('/global_graphs')) {
         console.log('send graph data')
         // append global info to data
         data.show = show.get_info()
         io.sockets.to('global_graphs').emit('update_global_graphs', data)
     }
+    // less than optimal... update device 0 for audiance
 }
 
 var graph_pkts = 0;
 var osc_pkts = 0;
 var show_beats_valid=0, show_beats_total=0, show_beats_valid_sum=0;
 var print_info_timer = new Timer(20000)
+print_info_timer.start_at(new Date().getTime()-16000) // run first time
 
 function processOsc(message) {
     // console.log("osc", message);
@@ -287,23 +271,28 @@ function processOsc(message) {
     osc_pkts+=1;
 
     if (process.stdin.isTTY && print_info_timer.is_it_time_yet()) {
-        console.log('pps osc:', packets_per_second(osc_pkts))
-        console.log("show.devices");
+        console.log("SHOW INFORMATION");
         Object.keys(show.devices).forEach(function(v){
             var device=show.devices[v]
-            console.log(device.id,device.bpm.bpm_avg)
-            console.log(device.bpm.samples.slice(device.bpm.samples.length-5))
-            console.log(device.bpm.bpm_window.join())
+            console.log(device.id,"\t",
+                        device.bpm.bpm_avg,"\t",
+                        device.bpm.samples.slice(
+                            device.bpm.samples.length-3).join())
+            console.log(device.bpm.averages.length)
+            console.log(device.bpm.averages)
+            // console.log(device.bpm.bpm_window.join())
         });
         // total beats:
         console.log("show total beats:", show.total_beats_count);
-        console.log("show average bpm:", show.total_beats_sum/show.total_beats_sum);
+        console.log("show average bpm:",
+                    show.total_beats_sum/show.total_beats_count);
+        console.log('osc packets_per_second:', packets_per_second(osc_pkts))
     }
 
 
     // parse message
     var path = message[0].split('/');
-    var device_id = path[1];
+    var device_id = 'device_'+path[1];
     var type = path[2];
     var pulse_value = message[1];
 
@@ -363,6 +352,42 @@ function packets_per_second(packets_total) {
 
 
 
+/*
+
+ Test Server Setup
+
+ */
+
+
+ if (runtestserver) {
+     const { exec } = require('child_process');
+
+     app.use('/runtest', (req, res) => {
+         exec('/bin/ps aux | grep osc_record_replay.py | grep timeout | grep -v grep | wc -l', (err, stdout, stderr) => {
+           console.log(`stdou: ${stdout}`);
+           console.log(`stderr: ${stderr}`);
+           if (stdout && parseInt(stdout) > 0) {
+               res.send(`Test streams already running: ${stdout}<br><br><a href="/runtestend">stop streams</a><br><br><a href="/runtestcleardata">reset show data</a>`);
+           }
+           else {
+               res.send(`Test streams already running: 0<br><br><a href="/runtestbegin">start streams</a> for 20 minutes<br><br><a href="/runtestcleardata">reset show data</a>`);
+           }
+         });
+
+     });
+     app.use('/runtestbegin', (req, res) => {
+         exec('cd ./test/osc_player/ && timeout 20m ./run4.sh >/dev/null &', (err, stdout, stderr) => {});
+         res.redirect('back');
+     });
+     app.use('/runtestend', (req, res) => {
+         exec("/bin/ps aux | grep osc_record_replay.py | grep -v grep | awk '{print $2}' | xargs kill", (err, stdout, stderr) => {});
+         res.redirect('back');
+     });
+     app.use('/runtestcleardata', (req, res) => {
+         show.reset();
+         res.redirect('back');
+     });
+ }
 
 
 

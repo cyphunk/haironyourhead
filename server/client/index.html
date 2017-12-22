@@ -1,7 +1,7 @@
 <html>
 <head>
     <script src="http://hoyh.nocompany.co/socket.io/socket.io.js"></script>
-    <!-- <script src="/socket.io/socket.io.js"></script> -->
+    <script src="/socket.io/socket.io.js"></script>
 
 <script>
     console.log('it may take a few seconds for the first connection')
@@ -9,7 +9,11 @@
     // localStorage.debug='*';
     localStorage.debug='';
 
-    var socket = io.connect('http://hoyh.nocompany.co');
+    if (window.location.href.indexOf('hoyh.nocompany.co')>=0)
+        var socket = io.connect('http://hoyh.nocompany.co');
+    else
+        var socket = io.connect('');
+
     // var socket = io.connect('');
 
     var show_info = {}
@@ -38,7 +42,8 @@
         console.log(data)
         show_info = data
 
-        quickDemo();
+        socket.emit('get_averages')
+        // quickDemo();
     });
 
     // this data structure will hold our device data
@@ -58,6 +63,12 @@
             }
     	});
     }); // result of get_samples message from client
+
+
+    socket.on('averages', function(data){
+        console.log('### averages',data)
+        printobject(data)
+    })
 
 
     function quickDemo() {
@@ -184,6 +195,6 @@
 
 </head>
 <body>
-look at the source code and open the javascript console
+<pre id=data style='font-size:0.75em;'></pre>
 </body>
 </html>

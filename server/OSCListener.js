@@ -2,6 +2,10 @@
 
 var osc = require('node-osc');
 
+DEBUG = process.env.hasOwnProperty('DEBUG')
+
+var debug = require('debug')('osc')
+
 function Server(port, on_message_cb) {
     this.port = port;
     this.on_message_cb = on_message_cb;
@@ -36,6 +40,7 @@ Server.prototype = {
 
         this.server = new osc.Server(this.port, this.serverip);
         this.server.on("message", function (message, rinfo) {
+            debug('message', message)
             _this.on_message_cb(message);
             // console.log("Message:");
             // console.log(message);

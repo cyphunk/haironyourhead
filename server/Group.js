@@ -44,24 +44,7 @@ onconnect:
 
 var Timer = require('./Timer.js')
 
-
-DEBUG = [
-    'beat',
-    // 'show_bpm',
-    // 'bpm_detect',
-    // 'bpm_systolic',
-    // 'bpm_add',
-    // 'bpm_init'
-]
-
-if (DEBUG.length > 0 && process.stdin.isTTY)
-    console.debug = function() {
-        if (DEBUG.indexOf(arguments[0])>=0)
-            console.log.apply(this,arguments)
-    }
-else
-    console.debug = function(){}
-
+DEBUG = process.env.hasOwnProperty('DEBUG')
 
 function Pulse(id, samples_per_second, options) {
     this.id         = id
@@ -71,6 +54,11 @@ function Pulse(id, samples_per_second, options) {
     this.samples = [];
 
     this.samples_record_timer = new Timer(1000 / this.samples_ps /* wait_for_ms */ )
+
+    if (DEBUG)
+        this.debug = require('debug')('timer:pulse')
+    else
+        this.debug = function(){}
 }
 Pulse.prototype = {
     append: function(value){
@@ -115,7 +103,6 @@ Pulse.prototype = {
 
 
 
-
 function BPM(id, samples_per_second, options, on_beat_cb) {
     this.options    = options;
     this.id         = id;
@@ -129,7 +116,7 @@ function BPM(id, samples_per_second, options, on_beat_cb) {
     this.samples = [];     // we will assume each sample is in sync with `samples_ps`
 
     // last recorded BPM average
-    this.bpm_avg      = 0; // DYNAMIC
+    this.bpm_avg      = 0; // DYNAMICLY SET
 
     // `bpm_window` window stores N number of beats that we use to calculate BPM
     this.bpm_window   = []; //Array(this.options.bpm_window_size).fill(now);
@@ -164,23 +151,60 @@ function BPM(id, samples_per_second, options, on_beat_cb) {
     // beat by setting `_waitingforbeatpeak = true`
     this.options.diastolic_roof_value = options.pulse_max*options.diastolic_roof
 
-    // spread record is 10 second window recorder
-    this.spread_record_timer = new Timer(10000); // once every 10 seconds
-    this.spread_buffer = []
-    this.spread = []
 
-    console.debug('bpm_init', 'samples_record_timer:', this.samples_record_timer.wait_for_ms, this.samples_record_timer.last_ms, '(wait_ms last_ms)')
-    console.debug('bpm_init', 'systolic_timer:', this.systolic_timer.wait_for_ms, this.systolic_timer.last_ms, '(wait_ms last_ms)')
-    console.debug('bpm_init', 'systolic:', this.options.systolic_min_ms, this.options.systolic_max_ms, '(systolic_min_ms systolic_max_ms)')
+    /*
+     Abstractions
+     */
+    // calculate with beatts:
+    this.self_stddev = []
+    this.group_stddev = []
+    this.self_volitility_score = 0
+    this.group_volitility_score = 0
+    // every 10 seconds
+    this.averages = []
+    this.averages_record_timer = new Timer(10000, now)
+    this._averages_n_samples = (10000/1000)*this.samples_ps
+    this._averages_offset = 0
+
+    if (DEBUG) {
+        this.debug  = require('debug')('bpm')
+        this.debuga = require('debug')('bpm:init')
+        this.debugb = require('debug')('bpm:detect')
+        this.debugc = require('debug')('bpm:verbose')
+        this.debugd = require('debug')('bpm:abstract')
+    }
+    else {
+        this.debug  = function(){}
+        this.debuga = function(){}
+        this.debugb = function(){}
+        this.debugc = function(){}
+        this.debugd = function(){}
+    }
+    this.debuga('samples_record_timer:',
+                 this.samples_record_timer.wait_for_ms,
+                 this.samples_record_timer.last_ms, '(wait_ms last_ms)')
+    this.debuga('systolic_timer:',
+                 this.systolic_timer.wait_for_ms,
+                 this.systolic_timer.last_ms, '(wait_ms last_ms)')
+    this.debuga('systolic:',
+                 this.options.systolic_min_ms,
+                 this.options.systolic_max_ms, '(systolic_min_ms systolic_max_ms)')
 }
 BPM.prototype = {
+    /*
+
+     Primary DETECT functions
+
+     */
     bpm_valid: function(bpm) {
                    return bpm >= this.options.bpm_min &&
                           bpm <= this.options.bpm_max; },
     calc_bpm_avg: function () {
         if (this.bpm_length < 2)
             return -1
-        var avg_beat_length_ms = (this.bpm_window[this.bpm_window.length-1]-this.bpm_window[0]) / this.bpm_window.length
+        var avg_beat_length_ms = (this.bpm_window[this.bpm_window.length-1]
+                                  - this.bpm_window[0])
+                                  / this.bpm_window.length
         var avg = (60*1000) / avg_beat_length_ms
         if (!this.bpm_valid(avg))
             return 0; //this.options.default_bpm_avg;
@@ -190,7 +214,7 @@ BPM.prototype = {
         if (this.bpm_window.length >= this.options.bpm_window_size)
             this.bpm_window.shift()
         this.bpm_window.push(timestamp)
-        console.debug('bpm_add', this.bpm_window, '(bpm_window)')
+        this.debugc(this.bpm_window, '(bpm_window)')
     },
 
     systolic_wait_ms_valid: function(ms) {
@@ -198,47 +222,21 @@ BPM.prototype = {
                                        ms <= this.options.systolic_max_ms; },
     calc_systolic_wait_ms: function () {
         var ms = ((60/this.bpm_avg)*1000) * this.options.systolic_width;
-        console.debug('bpm_systolic',ms,this.bpm_avg,this.systolic_timer.wait_for_ms,'(ms bpm_avg wait_ms)')
+        this.debugc('bpm_systolic', ms, this.bpm_avg,
+                     this.systolic_timer.wait_for_ms, '(ms bpm_avg wait_ms)')
         if (!this.systolic_wait_ms_valid(ms))
             return this.options.systolic_min_ms;
-        console.debug('bpm_systolic', 'valid')
+        this.debugc('bpm_systolic', 'valid')
         return ms;
     },
-    /*
-    append: function(value){
-        // first sample
-        if (this.samples.length === 0) {
-            console.debug(arguments[0], 'first')
-            var now = new Date().getTime();
-            this.samples.push(value)
-            this._last_ms = now;
-            return;
-        }
-        // If more than two cycles have passed it indicates a large gap to fill
-        else if (elapsed_ms = this.systolic_timer.is_it_time_yet(2)) {
-            var n_missing  = parseInt(elapsed_ms / this.systolic_timer.wait_for_ms);
-            console.debug(arguments[0],'n_missing', n_missing, elapsed_ms, this.systolic_timer.wait_for_ms)
-            this.samples.concat( Array(n_missing-1)
-                                 .fill(this.samples) )
-            this.samples.push(value)
-        }
-        // if one cycle has passed, record a sample
-        else if (this.systolic_timer.is_it_time_yet(this)) {
-            console.debug(arguments[0], '')
-            this.samples.push(value)
-        }
-        // assume data is coming in live and never store time stamps
-        // rather than keep timestamps for every value
-        // we just make sure to fill up the array for missing values
-        // and keep the start time
-    },
-    */
     detect: function(pulse_value) {
-        console.debug('bpm_detect','detect begin', pulse_value)
+        this.debugb('detect begin', pulse_value)
         if (this._waitingforbeatpeak) {
             if (pulse_value >= this.options.systolic_floor_value) {
-                console.debug('bpm_detect','pulse_value > systolic_floor_value:',pulse_value,this.options.systolic_floor_value)
-                console.debug('beat', "bang")
+                this.debug('beat')
+
+                this.debugb('pulse_value > systolic_floor_value:',
+                             pulse_value, this.options.systolic_floor_value)
 
                 this._waitingforbeatpeak = false;
 
@@ -261,10 +259,10 @@ BPM.prototype = {
                 }
                 // not first but way too much time passed, fill in gap
                 else if (elapsed_ms = this.samples_record_timer.is_it_time_yet(2)) {
-                    console.debug('bpm_detect', 'too much time elapsed :', this.samples_record_timer.wait_for_ms*2 , '(wait_ms*2)')
+                    this.debugb('too much time elapsed :', this.samples_record_timer.wait_for_ms*2 , '(wait_ms*2)')
                     // too long has passed, fill in
                     var n_missing  = parseInt(elapsed_ms / this.samples_record_timer.wait_for_ms);
-                    console.debug('bpm_detect',n_missing,this.samples)
+                    this.debugb('missing samples',n_missing,this.samples)
                     if (this.options.null_on_fail) {
                         for (i=n_missing-1;i>0;i--)
                             this.samples.push([now-(this.samples_record_timer.wait_for_ms*i),0])
@@ -276,7 +274,7 @@ BPM.prototype = {
                     }
                 }
                 else if (elapsed_ms = this.samples_record_timer.is_it_time_yet()) {
-                    console.debug('bpm_detect','enough time elapsed :', this.samples_record_timer.wait_for_ms, '(wait_ms)')
+                    this.debugb('enough time elapsed :', this.samples_record_timer.wait_for_ms, '(wait_ms)')
                     this.samples.push([now,this.bpm_avg])
                 }
 
@@ -289,27 +287,56 @@ BPM.prototype = {
         }
         else if (this._waitingforbeatfloor || this.systolic_timer.is_it_time_yet() ) {
             if (!this._waitingforbeatfloor)
-                console.debug('bpm_detect', 'passed systolic_time, look for floor:', this.systolic_timer.wait_for_ms, this.options.diastolic_roof_value, '(wait_ms diastolic_roof_value)')
+                this.debugb('passed systolic_time, look for floor:', this.systolic_timer.wait_for_ms, this.options.diastolic_roof_value, '(wait_ms diastolic_roof_value)')
             else
-                console.debug('bpm_detect','look for floor:',  this.options.diastolic_roof_value, '(diastolic_roof_value)')
+                this.debugb('look for floor:',  this.options.diastolic_roof_value, '(diastolic_roof_value)')
 
             this._waitingforbeatfloor = true
             // systolic waiting period has passed
             if (pulse_value <= this.options.diastolic_roof_value) {
-                console.debug('bpm_detect','found floor', '(pulse_value)')
+                this.debugb('found floor', '(pulse_value)')
                 this._waitingforbeatpeak = true
                 this._waitingforbeatfloor = false
 
             }
         }
+    },
+
+    /*
+
+     Abstractoin functions
+
+     */
+
+    generate_average_spread: function() {
+        if (!this.averages_record_timer.is_it_time_yet() ||
+             this.samples.length <= this._averages_offset+this._averages_n_samples)
+            return;
+        // so that we do not filter the entire samples, just take samples_ps*10+1 of last
+        var offset = this.samples.length - this._averages_n_samples
+
+        this.debugd('generate_average_spread', this.id, offset,
+                     this._averages_n_samples, this.samples.length)
+        var latest = this.samples.slice(offset)
+                                 //.sort(function(a,b){return a - b}) // sort numeric
+        this.debugd('generate_average_spread samples length', latest.length)
+
+        var ms   = latest[0][0]
+        var avg  = latest.reduce(function(a,b){return a+b[1]},0) / latest.length
+        var low  = latest[0][1]
+        var high = latest[latest.length-1][1]
+        this.averages.push([ms, low, parseInt(avg), high])
     }
 }
 
 
 
+
+
+
+
 function Device(id, options, on_beat_cb) {
     this.id    = id;
-    this.name2 = this.name
     this.bpm   = new BPM(this.id, options.bpm_samples_per_second, options.bpm, on_beat_cb);
     // this.pulse = new Pulse(id, options.pulse_samples_per_second, options.pulse);
     // this.gsr   = new GSR(id, options.gsr_samples_per_second);
@@ -322,25 +349,32 @@ Device.prototype = {
 
 var default_options = {
     pulse_samples_per_second: 10, // 10=2,160,000 values per hour
-    bpm_samples_per_second: 1,    //  1=  216,000
-    gsr_samples_per_second: 1,
+    bpm_samples_per_second:   1,    //  1=  216,000
+    gsr_samples_per_second:   1,
 
     bpm: {
         default_bpm_avg: 60,
-        pulse_min: 0,
-        pulse_max: 1000,
-        systolic_floor: 0.6, // beat if over pulse_max*this
-        diastolic_roof: 0.4, // after pulse_max*this start looking again
-        systolic_width: 0.3, // after bpm*this time is we will look for new beat
-        bpm_min: 40,
-        bpm_max: 220,
+        pulse_min:       0,
+        pulse_max:       1000,
+        systolic_floor:  0.6, // beat if over pulse_max*this
+        diastolic_roof:  0.4, // after pulse_max*this start looking again
+        systolic_width:  0.3, // after bpm*this time is we will look for new beat
+        bpm_min:         40,
+        bpm_max:         220,
         bpm_window_size: 6,
-        null_on_fail: false,
+        null_on_fail:    false,
     },
     pulse: {
         null_on_fail: true
     },
+    // TODO: May not need this any more since device_0 is caluclating averages for group
     update_group_info_on_beat: true, // false for efficiency
+
+    abstractions: {
+        samples_per_second:        1,
+        spread_samples_per_second: 0.1, // every 10 seconds
+    },
+
 }
 
 
@@ -359,9 +393,21 @@ function Group(name, options) {
     this.total_beats_count = 0;
     this.total_beats_sum = 0;
 
+
+    if (DEBUG) {
+        this.debug = require('debug')('group')
+    }
+    else {
+        this.debug = function(){}
+    }
+
+    // root device just tracks the full group aggregate avg as a seperate devices
+    this.add_device('device_0')
+
 }
 Group.prototype = {
     add_device: function(device_id) {
+        this.debug('add_device', device_id)
         if (!this.devices.hasOwnProperty[device_id])
             this.devices[device_id] = new Device(device_id, this.options, this.on_beat_cb);
     },
@@ -374,22 +420,11 @@ Group.prototype = {
         this.devices = {}
         this.bpm_avg = []
     },
-    update_total_bpm_info: function (bpm) {
-        // THIS here is in the cb context (BPM object)
-        console.debug('show_bpm', 'data',bpm ,this.options.update_group_info_on_beat)
-        if (this.options.update_group_info_on_beat
-            && bpm > 0) {
-            // this too is not in Group context
-            this.total_beats_count += 1
-            this.total_beats_sum += bpm
-            console.debug('show_bpm', 'update', this.total_beats_sum, this.total_beats_sum )
-        }
-    },
     get_info: function () {
         return {
             total_beats_count: this.total_beats_count,
-            total_beats_sum: this.total_beats_sum,
-            total_bpm_avg: this.total_beats_sum/this.total_beats_count
+            total_beats_sum:   this.total_beats_sum,
+            total_bpm_avg:     this.total_beats_sum/this.total_beats_count
         }
     },
     get_bpm_last: function (device_id) {
@@ -407,7 +442,47 @@ Group.prototype = {
             })
             return devices;
         }
-    }
+    },
+    update_total_bpm_info: function (bpm) {
+        // THIS here is in the cb context (BPM object)
+        // this.debug('update_total_bpm_info data',bpm ,this.options.update_group_info_on_beat)
+        if (this.options.update_group_info_on_beat
+            && bpm > 0) {
+            // this too is not in Group context
+            this.total_beats_count += 1
+            this.total_beats_sum += bpm
+            // this.debug('update_total_bpm_info sum count', this.total_beats_sum, this.total_beats_count )
+        }
+    },
+    // Once a second or so update the BPM for device_0 using an average of all users
+    // Also generate average spread
+    update_aggregate_device: function(time) {
+        // only update once a second
+        this.debug('update_aggregate_device')
+        debugger
+        if (!this.devices.device_0.bpm.samples_record_timer.is_it_time_yet())
+            return 0;
+        // TODO: do we want samples from devices that have not reported in a long while?
+        // because that is currently what is appening with this function
+        // var devices = this.get_bpm_last()
+        var total = 0, count = 0, avg =0
+        var _this = this;
+        Object.keys(this.devices).forEach(function(device_id) {
+            if (device_id == 'device_0') return;
+            var len = _this.devices[device_id].bpm.samples.length
+            if (len == 0) return;
+            var bpm = _this.devices[device_id].bpm.samples[len-1][1]
+            if (bpm <= 0) return;
+            _this.debug('update_aggregate_device  bpm', bpm[1])
+            total += bpm
+            count += 1
+            _this.debug('update_aggregate_device  total/count', total,count)
+        })
+        var avg = parseInt(total / count) || 0
+        _this.devices.device_0.bpm.samples.push([time,avg])
+        _this.devices.device_0.bpm.bpm_avg = avg
+        _this.devices.device_0.bpm.generate_average_spread()
+    },
 }
 
 

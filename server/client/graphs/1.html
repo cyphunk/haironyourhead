@@ -177,7 +177,7 @@ function control_toggle() {
     &nbsp;<span id=toggle style='font-size:33pt' onclick='control_toggle()'>-</span>
     <div id=controls>
 <table><td valign=top>
-    <input id=device_id size=3> device id<br/>
+    <input id=device_id size=7 value=device_> device id<br/>
     <select id=engine size=2><option value=canvasjs selected>canvasjs</option><option value=d3>d3</option></select> engine<br>
 </td><td>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td><td valign=top>
 
@@ -581,7 +581,7 @@ function kagi_start(device_id) {
             // var options = Object.assign({}, chart_options)
             document.getElementById('kagiCharts').appendChild(div)
             var value = data[data.length-1].close
-            var diff = parseInt(value-show_info.bpm_avg)
+            var diff = parseInt(value-show_info.total_bpm_avg)
             var diffstr = (diff>0 ? '+' : '')+diff
             KagiChart(data,{
                     "caption": value+' ('+diffstr+')',
