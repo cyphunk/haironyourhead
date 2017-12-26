@@ -1,0 +1,111 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="utf-8">
+
+<style>
+
+  body{
+    margin: 0;
+    background: black;
+  }
+  #vis {
+    padding-top: 0px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+
+</style>
+
+</head>
+<body>
+
+   <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.4/socket.io.js"></script> -->
+   <!-- <script src="js/socket-io.js"></script> -->
+   <script src="http://hoyh.nocompany.co/socket.io/socket.io.js"></script>
+
+<script>
+
+     var socket = io.connect('http://hoyh.nocompany.co/');
+
+
+     // socket.emit('subscribe_to_global_graphs');
+     // var bpm_data = {}
+     // // after you send this to server it will start sending you
+     // // update_device_graph messages on every new BPM
+     // socket.on('update_device_graph', function(data) {
+     //    if (!bpm_data.hasOwnProperty(data.id))
+     //         bpm_data[data.id] = [];
+     //    var device_id = data.id;
+     //    var bpm_value = data.bpm;
+     //    bpm_data[device_id].push(data);
+     // });
+
+     device_id = "201"
+
+     socket.on('connect', function () {
+
+         console.log('### connected')
+
+         // get the history:
+         socket.emit('get_samples', device_id)
+     });
+
+
+    // this version append all new data
+    var devices = {}
+    socket.on('samples', function(data){
+    console.log('returned samples size:', data['dev_'+device_id].bpm.samples.length)
+      if (Object.keys(devices).length == 0) {
+        devices = data
+      }
+
+      // we assume all data is new and there is no overlap
+      Object.keys(devices).forEach(function(k) {
+        console.log(k)
+        devices[k].bpm.samples.concat(data[k].bpm.samples)
+      });
+    });
+
+    setTimeout(function() {
+        var last_value_index = devices['dev_'+device_id].bpm.samples.length-1
+        var last_value_timestamp = devices['dev_'+device_id].bpm.samples[last_value_index][0]
+        console.log('get from', last_value_timestamp)
+        socket.emit('get_samples', device_id, last_value_timestamp)
+        console.log(devices)
+    }, 3000);
+
+    setTimeout(function() {
+        var last_value_index = devices['dev_'+device_id].bpm.samples.length-1
+        var last_value_timestamp = devices['dev_'+device_id].bpm.samples[last_value_index][0]
+        console.log('get from', last_value_timestamp)
+        socket.emit('get_samples', device_id, last_value_timestamp)
+        console.log(devices)
+    }, 10000);
+
+
+    setTimeout(function() {
+        var last_value_index = devices['dev_'+device_id].bpm.samples.length-1
+        var last_value_timestamp = devices['dev_'+device_id].bpm.samples[last_value_index][0]
+        console.log('get from', last_value_timestamp)
+        socket.emit('get_samples', device_id, last_value_timestamp)
+        console.log(devices)
+    }, 20000);
+
+    setTimeout(function() {
+        var last_value_index = devices['dev_'+device_id].bpm.samples.length-1
+        var last_value_timestamp = devices['dev_'+device_id].bpm.samples[last_value_index][0]
+        console.log('get from', last_value_timestamp)
+        socket.emit('get_samples', device_id, last_value_timestamp)
+        console.log(devices)
+    }, 30000);
+
+
+
+</script>
+
+</body>
+</html>

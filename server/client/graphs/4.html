@@ -1,0 +1,105 @@
+<html>
+<head>
+    <script src="http://hoyh.nocompany.co/socket.io/socket.io.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+
+<script>
+    console.log('it may take a few seconds for the first connection')
+
+    // localStorage.debug='*';
+    localStorage.debug='';
+
+    if (window.location.href.indexOf('hoyh.nocompany.co')>=0)
+        var socket = io.connect('http://hoyh.nocompany.co');
+    else
+        var socket = io.connect('');
+
+    var show_info = {}
+    /* On server defined as:
+    {
+        name: show.name,
+        timebegin: show.timebegin,
+        device_ids: Object.keys(show.devices),
+        beats_total: show_beats_total,
+        beats_valid: show_beats_valid,
+        beats_valid_sum: show_beats_valid_sum,
+        bpm_avg: show_beats_valid_sum/show_beats_valid,
+        options: show.options
+    }
+    */
+
+
+    socket.on('connect', function () {
+        console.log('### connected')
+
+        socket.emit('get_show_info') // results in a show_info message from srv
+
+        socket.emit('get_averages', null, 'latest')
+        // window.setInterval(function(){
+        //     socket.emit('get_averages', null, 'latest')
+        // },2000)
+    });
+
+    socket.on('show_info', function (data){
+        console.log('### show_info', data)
+        show_info = data
+    });
+
+    // this data structure will hold our device data
+    devices = {}
+
+    // this version merges the new data
+    socket.on('averages', function(data){
+        console.log('### averages', data)
+    	Object.keys(data).forEach(function(k) {
+            var d = document.getElementById(k)
+            if (!d) {
+                d = document.createElement('div')
+                d.id = k
+                d.className = 'hrbox'
+                document.getElementById('data').appendChild(d)
+            }
+            d.data = data[k].bpm.averages[0][2] //store hr
+            d.innerHTML=k+'<br>'+data[k].bpm.averages[0][2]+'<br>lo:'+data[k].bpm.averages[0][1]+' hi:'+data[k].bpm.averages[0][3]
+    	});
+
+    }); // result of get_samples message from client
+
+
+
+    function sort() {
+        var elems = document.getElementsByClassName('hrbox')
+        var sorted = [elems[0].data]
+        Object.keys(elems).forEach(function(i){
+            if (elems[i].data >= sorted[sorted.length-1])
+                sorted.push(elems[i].data)
+            else if (elems[i].data <= sorted[0])
+                sorted.splice(0,0,elems[i].data)
+            else
+                console.log('wtf',i,elems[i],elems[i].data)
+
+        })
+        document.getElementById('data').innerHTML = ''
+        Object.keys(sorted).forEach(function(i){
+            d = document.createElement('div')
+            d.innerHTML = sorted[i]
+            document.getElementById('data').appendChild(d)
+        })
+    }
+    </script>
+<style>
+.hrbox {
+    width: 100px;
+    height: 100px;
+    background-color: #eee;
+    margin: 10;
+    float: left;
+}
+</style>
+</head>
+<body>
+    using 10 second averages instead of 1 second sliding window<br>
+    <button onclick='sort()'>sort</button><br>
+    <div id=data></div>
+</body>
+</html>

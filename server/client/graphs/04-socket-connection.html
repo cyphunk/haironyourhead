@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta charset="utf-8">
+
+<style>
+
+  body{
+    margin: 0;
+    background: black;
+  }
+  #vis {
+    padding-top: 0px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+
+</style>
+
+</head>
+<body>
+
+   <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.0.4/socket.io.js"></script> -->
+   <!-- <script src="js/socket-io.js"></script> -->
+   <script src="http://hoyh.nocompany.co/socket.io/socket.io.js"></script>
+
+<script>
+
+     var socket = io.connect('http://hoyh.nocompany.co/');
+
+
+     // socket.emit('subscribe_to_global_graphs');
+     // var bpm_data = {}
+     // // after you send this to server it will start sending you
+     // // update_device_graph messages on every new BPM
+     // socket.on('update_device_graph', function(data) {
+     //    if (!bpm_data.hasOwnProperty(data.id))
+     //         bpm_data[data.id] = [];
+     //    var device_id = data.id;
+     //    var bpm_value = data.bpm;
+     //    bpm_data[device_id].push(data);
+     // });
+
+     device_id = "" // 0 // 201 // 204
+
+     socket.on('connect', function () {
+
+         console.log('### connected')
+
+         // get the history:
+         socket.emit('get_samples', device_id)
+     });
+
+
+    // this version append all new data
+    var devices = {}
+    // this version merges the new data
+    socket.on('samples', function(data){
+        // console.log('### samples')
+        // console.log(data)
+      // we assume all data is new and there is no overlap
+      Object.keys(data).forEach(function(k) {
+            if (!devices.hasOwnProperty(k)) {
+                devices[k] = data[k]
+            }
+            else {
+                devices[k].bpm.samples = devices[k].bpm.samples.concat(data[k].bpm.samples)
+                // devices[k].bpm.samples = devices[k].bpm.samples;
+            }
+      });
+    }); // result of get_samples message from client
+
+    var tensec = {}
+    var tensec_width_ms = 10000; /*10secod window*/
+    function generate_spread(device_id, /*null means all*/
+                             start_time_ms /* use this to calculate for all or only samples > this time */
+                             ) {
+        if (!device_id)
+            var device_ids = Object.keys(devices)
+        else
+            var device_ids = [device_id]
+        // console.log('tensec device_ids:', device_ids)
+        device_ids.forEach(function(k){
+            // console.log('tensec begin k:',k)
+            // handle condition where tensec[] first initialized
+            // initialize tensec
+            // set our prev_ms 10sec window iterator to 0 to first entry
+            //   for this key indevices
+            if (!tensec.hasOwnProperty(k)) {
+                tensec[k] = { bpm: { samples: [] }}
+                var prev_ms = devices[k].bpm.samples[0][0]
+            }
+            // this is being run after being run before, so set prev_ms to last entry
+            else if (tensec[k].bpm.samples.length > 0) {
+                var prev_ms = tensec[k].bpm.samples[tensec[k].bpm.samples.length-1][0] + tensec_width_ms
+            }
+            // this comes if for some reason we initialized but didn't have enough samples
+            // to fill in one samples entry:
+            else {
+                console.log('hmm. not much data?', k)
+            }
+
+            // temporary values
+            var sum = 0
+            var count = 0
+            var low = null
+            var high = null
+            devices[k].bpm.samples.forEach(function(entry){
+                console.log('1sec entry',k,entry,prev_ms,prev_ms+tensec_width_ms)
+
+                // sample out of bounds? to early
+                if (entry[0] < prev_ms)
+                    return;
+
+                console.log(entry[0]/1000,'>=',prev_ms/1000)
+
+                sum += entry[1]
+                count += 1
+                if (!high || entry[1] > high)
+                    high = entry[1]
+                if (!low || entry[1] < low)
+                    low = entry[1]
+
+                // hit the edge so do the calculations
+                if (entry[0] >= prev_ms+tensec_width_ms) {
+                    console.log('add 10sec entry:', prev_ms, '- low:', low, 'avg:', parseInt(sum/count), 'high:', high)
+                    tensec[k].bpm.samples.push([prev_ms,low,sum/count,high])
+                    prev_ms = prev_ms+tensec_width_ms
+                    low = null
+                    high = null
+                    sum = 0
+                    count = 0
+                }
+                else {
+                    console.log(entry[0]/1000,'!>=',(prev_ms+tensec_width_ms)/1000)
+                }
+            })
+        })
+        console.log(tensec)
+        setTimeout(function() {
+            generate_spread(null,new Date().getTime() - (10000));
+        }, 30000);
+    }
+
+    generate_spread(null,new Date().getTime() - (10000));
+
+
+
+
+</script>
+
+</body>
+</html>
