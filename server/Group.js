@@ -317,11 +317,13 @@ BPM.prototype = {
 
         this.debugd('generate_average_spread', this.id, offset,
                      this._averages_n_samples, this.samples.length)
+
         var latest = this.samples.slice(offset)
-                                 //.sort(function(a,b){return a - b}) // sort numeric
+        var ms     = latest[0][0]
+        latest.sort(function(a,b){return a - b}) // sort numeric
+
         this.debugd('generate_average_spread samples length', latest.length)
 
-        var ms   = latest[0][0]
         var avg  = latest.reduce(function(a,b){return a+b[1]},0) / latest.length
         var low  = latest[0][1]
         var high = latest[latest.length-1][1]
