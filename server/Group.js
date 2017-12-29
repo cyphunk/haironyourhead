@@ -320,7 +320,7 @@ BPM.prototype = {
 
         var latest = this.samples.slice(offset)
         var ms     = latest[0][0]
-        latest.sort(function(a,b){return a - b}) // sort numeric
+        latest.sort(function(a,b){return a[1] - b[1] }) // sort numeric
 
         this.debugd('generate_average_spread samples length', latest.length)
 
