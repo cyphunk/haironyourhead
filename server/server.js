@@ -157,9 +157,13 @@ io.sockets.on('connection', function(socket) {
             }
             // ONLY LAST SAMPLE for each
             else if (start_time == 'latest') {
-                if (!show.devices[id].bpm[array_name].length) return;
-                var last = show.devices[id].bpm[array_name].length-1
-                ret[id].bpm[array_name] = [show.devices[id].bpm[array_name][last]]
+                if (!show.devices[id].bpm[array_name].length) {
+                    ret[id].bpm[array_name] = []
+                }
+                else {
+                    var last = show.devices[id].bpm[array_name].length-1
+                    ret[id].bpm[array_name] = [show.devices[id].bpm[array_name][last]]
+                }
                 // gsr: { samples: show.devices[id].gsr.samples.filter(filter) } }
             }
             // SAMPLES BETWEEN RANGE
