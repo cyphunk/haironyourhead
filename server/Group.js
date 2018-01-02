@@ -304,7 +304,7 @@ BPM.prototype = {
 
     /*
 
-     Abstractoin functions
+     Abstraction functions
 
      */
 
