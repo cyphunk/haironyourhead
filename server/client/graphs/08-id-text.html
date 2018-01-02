@@ -125,7 +125,7 @@ function loadData() {
 socket.on('connect', function () {
     console.log('### connected')
 
-    // get last averages sample for all devices currently online
+    // get all averages sample for all devices currently online
     socket.emit('get_averages', null, null)
 });
 socket.on('averages', function(data){
