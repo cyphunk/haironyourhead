@@ -461,7 +461,6 @@ Group.prototype = {
     update_aggregate_device: function(time) {
         // only update once a second
         this.debug('update_aggregate_device')
-        debugger
         if (!this.devices.device_0.bpm.samples_record_timer.is_it_time_yet())
             return 0;
         // TODO: do we want samples from devices that have not reported in a long while?
