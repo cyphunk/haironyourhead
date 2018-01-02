@@ -1,6 +1,17 @@
 <!DOCTYPE html>
 <html>
 <head>
+
+<script src="http://hoyh.nocompany.co/socket.io/socket.io.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    if (window.location.href.indexOf('hoyh.nocompany.co')>=0)
+        var socket = io.connect('http://hoyh.nocompany.co');
+    else
+        var socket = io.connect('');
+</script>
+
+
 <style type="text/css">
 
   body{
@@ -100,7 +111,7 @@ function loadData() {
     avgMIN = data[0].min;
     avgAVG = data[0].avg;
     avgMAX = data[0].max;
-    
+
     boxVis(data);
 
     for (var i = data.length - 1; i >= 0; i--) {
@@ -113,14 +124,46 @@ function loadData() {
 
 }
 
-loadData();
+// loadData();
+
+socket.on('connect', function () {
+    console.log('### connected')
+
+    // get last averages sample for all devices currently online
+    socket.emit('get_averages', null, "latest")
+});
+socket.on('averages', function(data){
+    console.log('### averages',data)
+
+
+    avgMIN = data.device_0.bpm.averages[0][1];
+    avgAVG = data.device_0.bpm.averages[0][2];
+    avgMAX = data.device_0.bpm.averages[0][3];
+
+    boxVis_live(Object.values(data));
+
+    Object.keys(data).forEach(function(k) {
+        if (data[k].bpm.averages.length >= 1) {
+            var entry = data[k].bpm.averages[0]
+            var d = {
+                min: entry[1],
+                avg: entry[2],
+                max: entry[3]
+            }
+            pulseGradient(d,k);
+        }
+    });
+    initIsotope();
+
+})
+
 
 var gridGroup = d3.select(".gridGroup");
 
-function boxVis(data) {
-  
+function boxVis_live(data) {
+
   var gridItem = gridGroup.selectAll(".gridItem")
-    .data(data, function(d,i) { return i; });
+    .data(data, function(d,i) { return d.id; });
 
   gridItem.exit().remove();
 
@@ -130,11 +173,11 @@ function boxVis(data) {
     .enter()
     .append('div')
     .attr('class', 'gridItem')
-    .attr('id', function(d,i) { return 'itemID' + i })
+    .attr('id', function(d,i) { return 'itemID' + d.id })
     .append('canvas')
     .attr('width', widthCanvas)
     .attr('height', heightCanvas)
-    .attr('id', function(d,i) { return 'canvasID' + i });
+    .attr('id', function(d,i) { return 'canvasID' + d.id });
 
 
 }
@@ -168,7 +211,7 @@ function initIsotope() {
     $this.toggleClass('big');
 
     $container.isotope( 'layout' )
-    
+
   });
 
     // bind sort button click
@@ -217,7 +260,7 @@ function initIsotope() {
     });
   });
 
-  
+
 
 
 }
