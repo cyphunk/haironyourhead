@@ -1,6 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
+
+<script src="http://hoyh.nocompany.co/socket.io/socket.io.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    if (window.location.href.indexOf('file://')>=0)
+        var socket = io.connect('http://hoyh.nocompany.co');
+    else
+        var socket = io.connect('');
+</script>
+
 <style type="text/css">
 
   body{
@@ -90,8 +100,8 @@ var color = d3.scaleSequential(d3.interpolateRainbow).domain([110, 60]);
 function loadData() {
 
   d3.csv("data/data01.csv", function(data) {
-    
-    boxVis(data);
+
+    boxVis_file(data);
 
     for (var i = data.length - 1; i >= 0; i--) {
       pulseGradient(data[i],i);
@@ -103,12 +113,40 @@ function loadData() {
 
 }
 
-loadData();
+// loadData();
+
+socket.on('connect', function () {
+    console.log('### connected')
+
+    // get last averages sample for all devices currently online
+    socket.emit('get_averages', null, "latest")
+    window.setInterval(function() {
+        socket.emit('get_averages', null, "latest")
+    }, 5000)
+});
+socket.on('averages', function(data){
+    console.log('### averages',data)
+
+    boxVis_live(Object.values(data));
+
+    Object.keys(data).forEach(function(k) {
+        if (data[k].bpm.averages.length >= 1) {
+            var entry = data[k].bpm.averages[0]
+            var d = {
+                min: entry[1],
+                avg: entry[2],
+                max: entry[3]
+            }
+            pulseGradient(d,k);
+        }
+    });
+    initIsotope();
+})
+
 
 var gridGroup = d3.select(".gridGroup");
 
-function boxVis(data) {
-  
+function boxVis_file(data) {
   var gridItem = gridGroup.selectAll(".gridItem")
     .data(data, function(d,i) { return i; });
 
@@ -126,8 +164,29 @@ function boxVis(data) {
     .attr('height', heightCanvas)
     .attr('id', function(d,i) { return 'canvasID' + i });
 
+}
+
+function boxVis_live(data) {
+
+  var gridItem = gridGroup.selectAll(".gridItem")
+    .data(data, function(d,i) { return d.id; });
+
+  gridItem.exit().remove();
+
+  gridItem.transition().duration(500);
+
+  gridItem
+    .enter()
+    .append('div')
+    .attr('class', 'gridItem')
+    .attr('id', function(d,i) { return 'itemID' + d.id })
+    .append('canvas')
+    .attr('width', widthCanvas)
+    .attr('height', heightCanvas)
+    .attr('id', function(d,i) { return 'canvasID' + d.id });
 
 }
+
 
 function initIsotope() {
 
@@ -158,7 +217,7 @@ function initIsotope() {
     $this.toggleClass('big');
 
     $container.isotope( 'layout' )
-    
+
   });
 
     // bind sort button click
@@ -207,7 +266,7 @@ function initIsotope() {
     });
   });
 
-  
+
 
 
 }
@@ -231,6 +290,8 @@ function pulseGradientResize(data,index,width,height) {
 }
 
 function pulseGradient(data,index) {
+
+  d3.select('#itemID'+index).selectAll('text').remove();
 
   d3.select('#itemID'+index)
     .append('text')
