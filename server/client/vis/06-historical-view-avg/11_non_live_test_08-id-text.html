@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style type="text/css">
+
+  body{
+    background: black;
+    color: white;
+    font-family: 'helvetica';
+    margin: 0px;
+  }
+
+  .button-group{
+    margin: 5px;
+  }
+
+  .gridItem{
+    padding: 0px;
+    padding-top: 4px;
+    width: 100%;
+    height: 30px;
+    font-size: 0px;
+  }
+
+  .gridItem.big {
+    width: 100%;
+    height: 400px;
+    font-size: 20px;
+  }
+
+  .idText{
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    color: white;
+    font-size: 14px !important;
+  }
+
+  .minText{
+    position: absolute;
+    left: 10px;
+    top: 10px;
+    color: white;
+  }
+  .avgText{
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    /*transform: translate(0,50%);*/
+    color: white;
+  }
+  .maxText{
+    position: absolute;
+    left: 10px;
+    bottom: 10px;
+    color: white;
+  }
+</style>
+</head>
+<body>
+
+<script src="js/d3.v4.min.js" type="text/javascript" ></script>
+<script src="js/jquery.min.js" type="text/javascript" ></script>
+<script src="js/isotope.pkgd.min.js" type="text/javascript" ></script>
+<script src="js/packery-mode.pkgd.min.js"></script>
+
+<div class="button-group sort-by-button-group js-radio-button-group">
+  Sort by:
+    <button class="button" data-sort-value="">ID</button>
+    <button class="button" data-sort-value="minText">Min. Pulse</button>
+    <button class="button" data-sort-value="avgText">Avg. Pulse</button>
+    <button class="button" data-sort-value="maxText">Max. Pulse</button>
+</div>
+
+<div class="button-group filter-by-button-group js-radio-button-group">
+  Filter by:
+    <button id="filterNon" class="button" >Show all</button>
+    <button id="filterMin" class="button" >Min. Pulse < 70</button>
+    <button id="filterAvg" class="button" >Avg. Pulse 70 - 90</button>
+    <button id="filterMax" class="button" >Max. Pulse > 100</button>
+</div>
+
+<br>
+
+<div class="gridGroup"></div>
+
+<script>
+
+var documentWidth = window.innerWidth;
+
+var widthCanvas = documentWidth;
+var heightCanvas = 30;
+
+var color = d3.scaleSequential(d3.interpolateRainbow).domain([110, 60]);
+
+function loadData() {
+
+  d3.json("data/averages_kim.json", function(data) {
+    
+    boxVis(data);
+
+    for (var i = data.length - 1; i >= 0; i--) {
+      pulseGradient(data[i].data.bpm.averages,i,data[i].id);
+    }
+
+    initIsotope();
+
+  });
+
+}
+
+loadData();
+
+var gridGroup = d3.select(".gridGroup");
+
+function boxVis(data) {
+
+  var gridItem = gridGroup.selectAll(".gridItem")
+    .data(data, function(d,i) { 
+      return d.id; });
+
+  gridItem.exit().remove();
+
+  gridItem.transition().duration(500);
+
+  gridItem
+    .enter()
+    .append('div')
+    .attr('class', 'gridItem')
+    .attr('id', function(d,i) { return 'itemID' + d.id })
+    .append('canvas')
+    .attr('width', documentWidth)
+    .attr('height', heightCanvas)
+    .attr('id', function(d,i) { return 'canvasID' + d.id });
+
+
+}
+
+function initIsotope() {
+
+  var $container = $('.gridGroup');
+
+  $('.gridGroup').isotope({
+    // options
+    itemSelector: '.gridItem',
+    layoutMode: 'packery',
+    // stagger: 30,
+    getSortData: {
+      minText: '.minText parseInt',
+      avgText: '.avgText parseInt',
+      maxText: '.maxText parseInt'
+    }
+  });
+
+  $('.gridItem').click(function(){
+
+    var $this = $(this);
+
+    if ($this.hasClass('big')) {
+      pulseGradientResize(this.__data__.data.bpm.averages,this.id.slice(6),widthCanvas,30);
+    } else {
+      pulseGradientResize(this.__data__.data.bpm.averages,this.id.slice(6),documentWidth,400);
+    }
+
+    $this.toggleClass('big');
+
+    $container.isotope( 'layout' )
+    
+  });
+
+    // bind sort button click
+  $('.sort-by-button-group').on( 'click', 'button', function() {
+    var sortValue = $(this).attr('data-sort-value');
+    $container.isotope({ sortBy: sortValue });
+  });
+
+  // change is-checked class on buttons
+  $('.button-group').each( function( i, buttonGroup ) {
+    var $buttonGroup = $( buttonGroup );
+    $buttonGroup.on( 'click', 'button', function() {
+      $buttonGroup.find('.is-checked').removeClass('is-checked');
+      $( this ).addClass('is-checked');
+    });
+  });
+
+  $( "#filterNon" ).click(function() {
+    $container.isotope({ filter: '*' })
+  });
+
+  $( "#filterMin" ).click(function() {
+    $container.isotope({
+      filter: function() {
+        var number = $(this).find('.minText').text();
+        return parseInt( number, 10 ) < 70;
+      }
+    });
+  });
+
+  $( "#filterAvg" ).click(function() {
+    $container.isotope({
+      filter: function() {
+        var number = $(this).find('.avgText').text();
+        return parseInt( number, 10 ) > 70 && parseInt( number, 10 ) < 90;
+      }
+    });
+  });
+
+  $( "#filterMax" ).click(function() {
+    $container.isotope({
+      filter: function() {
+        var number = $(this).find('.maxText').text();
+        return parseInt( number, 10 ) > 100;
+      }
+    });
+  });
+
+  
+
+
+}
+
+function pulseGradientResize(data,index,width,height) {
+
+
+  // document.getElementById('canvasID'+index).width = 316;
+  document.getElementById('canvasID'+index).height = 400;
+
+  var c = document.getElementById("canvasID"+index);
+  var ctx = c.getContext("2d");
+
+  var grd = ctx.createLinearGradient(0,0,width,0);
+
+  data.forEach(function(d,i) {
+    grd.addColorStop(i/data.length,color(+d[2]));
+  })
+
+  ctx.fillStyle=grd;
+  ctx.fillRect(0,0,width,height);
+
+}
+
+function pulseGradient(data,index,id) {
+
+  d3.select('#itemID'+id).selectAll('text').remove();
+
+  var minAvg = d3.min(data, function(d) { return d[2]; });
+
+  d3.select('#itemID'+id)
+    .append('text')
+    .attr('class', 'minText')
+    .text(minAvg);
+
+  var meanAvg = d3.mean(data, function(d) { return d[2]; });
+
+  d3.select('#itemID'+id)
+    .append('text')
+    .attr('class', 'avgText')
+    .text(Math.round(meanAvg));
+
+  var maxAvg = d3.mean(data, function(d) { return d[2]; });
+
+  d3.select('#itemID'+id)
+    .append('text')
+    .attr('class', 'maxText')
+    .text(Math.round(maxAvg));
+
+  d3.select('#itemID'+id)
+    .append('text')
+    .attr('class', 'idText')
+    .text('ID '+ index);
+
+  var c = document.getElementById("canvasID"+id);
+  var ctx = c.getContext("2d");
+
+  var grd=ctx.createLinearGradient(0,0,widthCanvas,0);
+
+  data.forEach(function(d,i) {
+    grd.addColorStop(i/data.length,color(+d[2]));
+  })
+  // grd.addColorStop(0,"hsl("+(+data.min*3)+",100%,50%)");
+  // grd.addColorStop(.5,"hsl("+(+data.avg*3)+",100%,50%)");
+  // grd.addColorStop(1,"hsl("+(+data.max*3)+",100%,50%)");
+
+  ctx.fillStyle=grd;
+  ctx.fillRect(0,0,widthCanvas,heightCanvas);
+
+}
+
+</script>
+
+</body>
+</html>
