@@ -5,7 +5,7 @@
 <script src="http://hoyh.nocompany.co/socket.io/socket.io.js"></script>
 <script src="/socket.io/socket.io.js"></script>
 <script>
-    if (window.location.href.indexOf('hoyh.nocompany.co')>=0 || window.location.href.indexOf('file://')>=0)
+    if (window.location.href.indexOf('file://')>=0)
         var socket = io.connect('http://hoyh.nocompany.co');
     else
         var socket = io.connect('');

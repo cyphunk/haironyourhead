@@ -106,15 +106,15 @@ var color = d3.scaleSequential(d3.interpolateRainbow).domain([110, 60]);
 
 function loadData() {
 
-  d3.json("data/averages_kim.json", function(data) {
+  d3.json("data/averages.json", function(data) {
+    var dataArray = Object.values(data)
+    boxVis(Object.values(data));
 
-    boxVis(data);
-
-    for (var i = data.length - 1; i >= 0; i--) {
-      pulseGradient(data[i].data.bpm.averages,i,data[i].id);
+    for (var i = dataArray.length - 1; i >= 0; i--) {
+      pulseGradient(dataArray[i].bpm.averages, dataArray[i].id, dataArray[i].id);
     }
 
-    initIsotope();
+    initIsotope_live();
 
   });
 
@@ -146,10 +146,9 @@ socket.on('averages', function(data){
 var gridGroup = d3.select(".gridGroup");
 
 function boxVis(data) {
-
+  console.log('data',data)
   var gridItem = gridGroup.selectAll(".gridItem")
-    .data(data, function(d,i) {
-      return d.id; });
+    .data(data, function(d,i) { return d.id; });
 
   gridItem.exit().remove();
 
@@ -277,7 +276,7 @@ function pulseGradient(data,index,id) {
 
   var minAvg = d3.min(data, function(d) { return d[2]; });
 
-  d3.select('#itemID'+id).remove()
+  d3.select('#itemID'+id)
     .append('text')
     .attr('class', 'minText')
     .text(minAvg);
