@@ -147,12 +147,8 @@ function boxVis(data) {
   console.log('data',data)
   var gridItem = gridGroup.selectAll(".gridItem")
     .data(data, function(d,i) { return d.id; });
-<<<<<<< HEAD
-=======
 
   gridItem.exit().remove();
->>>>>>> origin/master
-
 
   gridItem
     .enter()
