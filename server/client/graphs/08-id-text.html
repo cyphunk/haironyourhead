@@ -127,6 +127,9 @@ socket.on('connect', function () {
 
     // get all averages sample for all devices currently online
     socket.emit('get_averages', null, null)
+    window.setInterval(function() {
+        socket.emit('get_averages', null, null)
+    }, 5000)
 });
 socket.on('averages', function(data){
     console.log('### averages',data)

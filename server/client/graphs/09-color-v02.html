@@ -5,7 +5,7 @@
 <script src="http://hoyh.nocompany.co/socket.io/socket.io.js"></script>
 <script src="/socket.io/socket.io.js"></script>
 <script>
-    if (window.location.href.indexOf('hoyh.nocompany.co')>=0)
+    if (window.location.href.indexOf('hoyh.nocompany.co')>=0 || window.location.href.indexOf('file://')>=0)
         var socket = io.connect('http://hoyh.nocompany.co');
     else
         var socket = io.connect('');
@@ -120,6 +120,9 @@ socket.on('connect', function () {
 
     // get last averages sample for all devices currently online
     socket.emit('get_averages', null, "latest")
+    window.setInterval(function() {
+        socket.emit('get_averages', null, "latest")
+    }, 5000)
 });
 socket.on('averages', function(data){
     console.log('### averages',data)
@@ -269,11 +272,17 @@ function pulseGradientResize(data,index,width,height) {
 
 function pulseGradient(data,index) {
 
-  d3.select('#itemID'+index)
-    .append('text')
-    .attr('class', 'minText')
-    .text(Math.round(data.min));
-
+  if ($('#itemID'+index).find('text.minText').length > 0) {
+    d3.select('#itemID'+index)
+      .select('text.minText')
+      .text(Math.round(data.min));
+  }
+  else{
+    d3.select('#itemID'+index)
+      .append('text')
+      .attr('class', 'minText')
+      .text(Math.round(data.min));
+  }
   d3.select('#itemID'+index)
     .append('text')
     .attr('class', 'avgText')
