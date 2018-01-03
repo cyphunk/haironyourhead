@@ -283,7 +283,7 @@ function processOsc(message) {
                         device.bpm.bpm_avg,"\t",
                         device.bpm.samples.slice(
                             device.bpm.samples.length-3).join())
-            console.log(device.bpm.averages.length)
+            console.log('averages',device.bpm.averages.length)
             console.log(device.bpm.averages)
             // console.log(device.bpm.bpm_window.join())
         });
