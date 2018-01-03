@@ -135,11 +135,7 @@ socket.on('averages', function(data){
 
     boxVis(Object.values(data));
 
-    Object.keys(data).forEach(function(k) {
-        if (data[k].bpm.averages.length >= 1) {
-            pulseGradient(data[k].bpm.averages,k,data[k].id);
-        }
-    });
+
     initIsotope_live();
 
 })
@@ -151,10 +147,12 @@ function boxVis(data) {
   console.log('data',data)
   var gridItem = gridGroup.selectAll(".gridItem")
     .data(data, function(d,i) { return d.id; });
+<<<<<<< HEAD
+=======
 
   gridItem.exit().remove();
+>>>>>>> origin/master
 
-  gridItem.transition().duration(500);
 
   gridItem
     .enter()
@@ -162,9 +160,15 @@ function boxVis(data) {
     .attr('class', 'gridItem')
     .attr('id', function(d,i) { return 'itemID' + d.id })
     .append('canvas')
+    .attr('id', function(d,i) { return 'canvasID' + d.id })
     .attr('width', documentWidth)
-    .attr('height', heightCanvas)
-    .attr('id', function(d,i) { return 'canvasID' + d.id });
+    .attr('height', heightCanvas);
+
+  Object.keys(data).forEach(function(k) {
+      if (data[k].bpm.averages.length >= 1) {
+          pulseGradient(data[k].bpm.averages,k,data[k].id);
+      }
+  });
 
 
 }
@@ -303,6 +307,7 @@ function pulseGradient(data,index,id) {
     .text('ID '+ index);
 
   var c = document.getElementById("canvasID"+id);
+
   var ctx = c.getContext("2d");
 
   var grd=ctx.createLinearGradient(0,0,widthCanvas,0);
@@ -310,12 +315,11 @@ function pulseGradient(data,index,id) {
   data.forEach(function(d,i) {
     grd.addColorStop(i/data.length,color(+d[2]));
   })
-  // grd.addColorStop(0,"hsl("+(+data.min*3)+",100%,50%)");
-  // grd.addColorStop(.5,"hsl("+(+data.avg*3)+",100%,50%)");
-  // grd.addColorStop(1,"hsl("+(+data.max*3)+",100%,50%)");
 
   ctx.fillStyle=grd;
   ctx.fillRect(0,0,widthCanvas,heightCanvas);
+
+  
 
 }
 
