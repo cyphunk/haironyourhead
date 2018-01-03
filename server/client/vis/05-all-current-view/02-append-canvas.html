@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style type="text/css">
+  .gridItem{
+    padding: 4px;
+  }
+</style>
+</head>
+<body>
+
+<script src="js/d3.v4.min.js" type="text/javascript" ></script>
+<script src="js/isotope.pkgd.min.js" type="text/javascript" ></script>
+
+<div class="gridGroup"></div>
+
+<script>
+
+var widthCanvas = 100;
+var heightCanvas = 100;
+
+function loadData() {
+
+  d3.csv("data/data01.csv", function(data) {
+    
+    boxVis(data);
+
+    for (var i = data.length - 1; i >= 0; i--) {
+      pulseGradient(data[i],i);
+    }
+  });
+
+}
+
+loadData();
+
+var gridGroup = d3.select(".gridGroup");
+
+function boxVis(data) {
+  
+  var gridItem = gridGroup.selectAll(".gridItem")
+    .data(data, function(d,i) { return i; });
+
+  gridItem.exit().remove();
+
+  gridItem.transition().duration(500);
+
+  gridItem
+    .enter()
+    .append('canvas')
+    .attr('class', 'gridItem')
+    .attr('id', function(d,i) { return 'itemID' + i })
+    .attr('width', widthCanvas)
+    .attr('height', heightCanvas);
+
+}
+
+function pulseGradient(data,index) {
+
+  console.log(data.min)
+
+  var c=document.getElementById("itemID"+index);
+  var ctx=c.getContext("2d");
+
+  var grd=ctx.createLinearGradient(0,0,widthCanvas,0);
+  grd.addColorStop(0,"hsl("+(data.min*3)+",100%,50%)");
+  grd.addColorStop(.5,"hsl("+(data.avg*3)+",100%,50%)");
+  grd.addColorStop(1,"hsl("+(data.max*3)+",100%,50%)");
+
+  ctx.fillStyle=grd;
+  ctx.fillRect(0,0,widthCanvas,heightCanvas);
+
+}
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style type="text/css">
+
+  text{
+    /*font-family: sans-serif;*/
+  }
+
+  .gridItem{
+    padding: 4px;
+  }
+
+
+  .minText{
+    position: absolute;
+    left: 10px;
+    bottom: 10px;
+    color: white;
+
+  }
+  .avgText{
+    position: absolute;
+    left: 50%;
+    bottom: 10px;
+    transform: translate(-50%,0);
+    color: white;
+
+  }
+  .maxText{
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    color: white;
+
+  }
+</style>
+</head>
+<body>
+
+<script src="js/d3.v4.min.js" type="text/javascript" ></script>
+<script src="js/isotope.pkgd.min.js" type="text/javascript" ></script>
+
+<div class="gridGroup"></div>
+
+<script>
+
+var widthCanvas = 100;
+var heightCanvas = 100;
+
+function loadData() {
+
+  d3.csv("data/data01.csv", function(data) {
+    
+    boxVis(data);
+
+    for (var i = data.length - 1; i >= 0; i--) {
+      pulseGradient(data[i],i);
+    }
+  });
+
+}
+
+loadData();
+
+var gridGroup = d3.select(".gridGroup");
+
+function boxVis(data) {
+  
+  var gridItem = gridGroup.selectAll(".gridItem")
+    .data(data, function(d,i) { return i; });
+
+  gridItem.exit().remove();
+
+  gridItem.transition().duration(500);
+
+  gridItem
+    .enter()
+    .append('div')
+    .attr('class', 'gridItem')
+    .attr('id', function(d,i) { return 'itemID' + i })
+    .append('canvas')
+    .attr('width', widthCanvas)
+    .attr('height', heightCanvas)
+    .attr('id', function(d,i) { return 'canvasID' + i })
+
+  var elem = document.querySelector('.gridGroup');
+
+  var iso = new Isotope( elem, {
+    // options
+    itemSelector: '.gridItem',
+    layoutMode: 'fitRows'
+  });
+
+
+}
+
+function pulseGradient(data,index) {
+
+  d3.select('#itemID'+index)
+    .append('text')
+    .attr('class', 'minText')
+    .text(Math.round(data.min));
+
+  d3.select('#itemID'+index)
+    .append('text')
+    .attr('class', 'avgText')
+    .text(Math.round(data.avg));
+
+  d3.select('#itemID'+index)
+    .append('text')
+    .attr('class', 'maxText')
+    .text(Math.round(data.max));
+
+  var c=document.getElementById("canvasID"+index);
+  var ctx=c.getContext("2d");
+
+  var grd=ctx.createLinearGradient(0,0,widthCanvas,0);
+  grd.addColorStop(0,"hsl("+(+data.min*3)+",100%,50%)");
+  grd.addColorStop(.5,"hsl("+(+data.avg*3)+",100%,50%)");
+  grd.addColorStop(1,"hsl("+(+data.max*3)+",100%,50%)");
+
+  ctx.fillStyle=grd;
+  ctx.fillRect(0,0,widthCanvas,heightCanvas);
+
+}
+
+</script>
+
+</body>
+</html>
