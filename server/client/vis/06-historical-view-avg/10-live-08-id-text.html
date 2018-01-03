@@ -106,27 +106,29 @@ var color = d3.scaleSequential(d3.interpolateRainbow).domain([110, 60]);
 
 function loadData() {
 
-  d3.json("data/averages_kim.json", function(data) {
+  d3.json("data/averages.json", function(data) {
+    boxVis(Object.values(data));
 
-    boxVis(data);
 
-    for (var i = data.length - 1; i >= 0; i--) {
-      pulseGradient(data[i].data.bpm.averages,i,data[i].id);
-    }
+    Object.keys(data)
+          .reverse()
+          .forEach(function(k){
+      pulseGradient(data[k].bpm.averages, data[k].id, data[k].id);
+    })
 
-    initIsotope();
+    initIsotope_live();
 
   });
 
 }
 
-// loadData();
+loadData();
 
 socket.on('connect', function () {
     console.log('### connected')
 
     // get all averages sample for all devices currently online
-    socket.emit('get_averages', null, null)
+    // socket.emit('get_averages', null, null)
 });
 socket.on('averages', function(data){
     console.log('### averages',data)
@@ -142,9 +144,14 @@ socket.on('averages', function(data){
 var gridGroup = d3.select(".gridGroup");
 
 function boxVis(data) {
-
+  console.log('data',data)
   var gridItem = gridGroup.selectAll(".gridItem")
     .data(data, function(d,i) { return d.id; });
+<<<<<<< HEAD
+=======
+
+  gridItem.exit().remove();
+>>>>>>> origin/master
 
 
   gridItem
