@@ -133,11 +133,7 @@ socket.on('averages', function(data){
 
     boxVis(Object.values(data));
 
-    Object.keys(data).forEach(function(k) {
-        if (data[k].bpm.averages.length >= 1) {
-            pulseGradient(data[k].bpm.averages,k,data[k].id);
-        }
-    });
+
     initIsotope_live();
 
 })
@@ -148,12 +144,8 @@ var gridGroup = d3.select(".gridGroup");
 function boxVis(data) {
 
   var gridItem = gridGroup.selectAll(".gridItem")
-    .data(data, function(d,i) {
-      return d.id; });
+    .data(data, function(d,i) { return d.id; });
 
-  gridItem.exit().remove();
-
-  gridItem.transition().duration(500);
 
   gridItem
     .enter()
@@ -161,9 +153,15 @@ function boxVis(data) {
     .attr('class', 'gridItem')
     .attr('id', function(d,i) { return 'itemID' + d.id })
     .append('canvas')
+    .attr('id', function(d,i) { return 'canvasID' + d.id })
     .attr('width', documentWidth)
-    .attr('height', heightCanvas)
-    .attr('id', function(d,i) { return 'canvasID' + d.id });
+    .attr('height', heightCanvas);
+
+  Object.keys(data).forEach(function(k) {
+      if (data[k].bpm.averages.length >= 1) {
+          pulseGradient(data[k].bpm.averages,k,data[k].id);
+      }
+  });
 
 
 }
@@ -277,7 +275,7 @@ function pulseGradient(data,index,id) {
 
   var minAvg = d3.min(data, function(d) { return d[2]; });
 
-  d3.select('#itemID'+id).remove()
+  d3.select('#itemID'+id)
     .append('text')
     .attr('class', 'minText')
     .text(minAvg);
@@ -302,6 +300,7 @@ function pulseGradient(data,index,id) {
     .text('ID '+ index);
 
   var c = document.getElementById("canvasID"+id);
+
   var ctx = c.getContext("2d");
 
   var grd=ctx.createLinearGradient(0,0,widthCanvas,0);
@@ -309,12 +308,11 @@ function pulseGradient(data,index,id) {
   data.forEach(function(d,i) {
     grd.addColorStop(i/data.length,color(+d[2]));
   })
-  // grd.addColorStop(0,"hsl("+(+data.min*3)+",100%,50%)");
-  // grd.addColorStop(.5,"hsl("+(+data.avg*3)+",100%,50%)");
-  // grd.addColorStop(1,"hsl("+(+data.max*3)+",100%,50%)");
 
   ctx.fillStyle=grd;
   ctx.fillRect(0,0,widthCanvas,heightCanvas);
+
+  
 
 }
 
