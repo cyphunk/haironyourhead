@@ -408,6 +408,14 @@ function Group(name, options) {
 
 }
 Group.prototype = {
+    reset: function () {
+        this.timebegin = new Date().getTime();
+        this.devices = {}
+        this.bpm_avg = []
+        this.total_beats_count = 0;
+        this.total_beats_sum = 0;
+        this.add_device('device_0')
+    },
     add_device: function(device_id) {
         this.debug('add_device', device_id)
         if (!this.devices.hasOwnProperty[device_id])
@@ -415,12 +423,6 @@ Group.prototype = {
     },
     end: function() {
         this.timeend = new Date().getTime();
-    },
-    reset: function () {
-        this.timebegin = new Date().getTime();
-
-        this.devices = {}
-        this.bpm_avg = []
     },
     get_info: function () {
         return {
