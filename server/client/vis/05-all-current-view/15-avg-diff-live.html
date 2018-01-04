@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+
 <script src="http://hoyh.nocompany.co/socket.io/socket.io.js"></script>
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -16,64 +17,44 @@
     background: black;
     color: white;
     font-family: 'helvetica';
-    margin: 0px;
-  }
-
-  .button-group{
-    margin: 5px;
   }
 
   .gridItem{
-    padding: 0px;
-    padding-top: 4px;
-    width: 100%;
-    height: 20px;
-    font-size: 0px;
+    padding: 4px;
+    width: 100px;
+    height: 100px;
   }
 
   .gridItem.big {
-    width: 100%;
-    height: 400px;
-    font-size: 20px;
+    width: 316px;
+    height: 316px;
   }
 
   .idText{
     position: absolute;
-    right: 10px;
-    top: 7px;
+    left: 10px;
+    top: 10px;
     color: white;
-    font-size: 14px !important;
+    font-size: 10px;
   }
 
   .minText{
     position: absolute;
     left: 10px;
-    top: 10px;
+    bottom: 10px;
     color: white;
   }
   .avgText{
     position: absolute;
-    left: 10px;
-    top: 50%;
-    /*transform: translate(0,50%);*/
+    left: 50%;
+    bottom: 10px;
+    transform: translate(-50%,0);
     color: white;
   }
   .maxText{
     position: absolute;
-    left: 10px;
-    bottom: 10px;
-    color: white;
-  }
-  .minTime{
-    position: absolute;
-    left: 10px;
-    top: -15px;
-    color: white;
-  }
-  .maxTime{
-    position: absolute;
     right: 10px;
-    top: -15px;
+    bottom: 10px;
     color: white;
   }
 </style>
@@ -93,6 +74,8 @@
     <button class="button" data-sort-value="maxText">Max. Pulse</button>
 </div>
 
+<br>
+
 <div class="button-group filter-by-button-group js-radio-button-group">
   Filter by:
     <button id="filterNon" class="button" >Show all</button>
@@ -102,39 +85,29 @@
 </div>
 
 <br>
-<br>
 
 <div class="gridGroup"></div>
 
 <script>
 
+var widthCanvas = 100;
+var heightCanvas = 100;
 
-
-var documentWidth = window.innerWidth;
-
-var widthCanvas = documentWidth;
-var heightCanvas = 20;
-
-var minBPM = 40;
-var maxBPM = 110;
+var minBPM = -50;
+var maxBPM = +50;
 
 var color = d3.scaleSequential(d3.interpolateRainbow).domain([maxBPM, minBPM]);
 
-var parseTime = d3.timeFormat("%Q");
-
-var timeScale = d3.scaleLinear().range([0, 1]);
-
-var minTime = 0;
-var maxTime = 0;
+var avgMIN, avgAVG, avgMAX;
 
 function loadData() {
 
-  d3.json("data/averages_kim.json", function(data) {
+  d3.csv("data/data01.csv", function(data) {
 
-    boxVis(data);
+    boxVis_file(data);
 
     for (var i = data.length - 1; i >= 0; i--) {
-      pulseGradient(data[i].data.bpm.averages,i,data[i].id);
+      pulseGradient(data[i],i);
     }
 
     initIsotope();
@@ -145,44 +118,86 @@ function loadData() {
 
 // loadData();
 
+var itemsNum = 0;
+
 socket.on('connect', function () {
     console.log('### connected')
 
-    // get all averages sample for all devices currently online
-    socket.emit('get_averages', null, null)
+    // get last averages sample for all devices currently online
+    socket.emit('get_averages', null, "latest")
+    window.setInterval(function() {
+        socket.emit('get_averages', null, "latest")
+    }, 5000)
 });
 socket.on('averages', function(data){
     console.log('### averages',data)
 
-    boxVis(Object.values(data));
+    avgMIN = data.device_0.bpm.averages[0][1];
+    avgAVG = data.device_0.bpm.averages[0][2];
+    avgMAX = data.device_0.bpm.averages[0][3];
 
-    initIsotope_live();
 
-})
+    if (itemsNum != Object.values(data).length) {
+      itemsNum = Object.values(data).length;
+
+      boxVis_live(Object.values(data));
+
+    }
+
+    Object.keys(data).forEach(function(k) {
+        if (data[k].bpm.averages.length >= 1) {
+            var entry = data[k].bpm.averages[0]
+            var d = {
+                min: entry[1],
+                avg: entry[2],
+                max: entry[3]
+            }
+            pulseGradient(d,k);
+        }
+    });
+    
+});
+
+
+initIsotope();
 
 
 var gridGroup = d3.select(".gridGroup");
 
-function boxVis(data) {
+function boxVis_file(data) {
+  var gridItem = gridGroup.selectAll(".gridItem")
+    .data(data, function(d,i) { return i; });
 
-  minTime = d3.min(data, function(d) { return d.bpm.averages[0][0]; });
-  maxTime = d3.max(data, function(d) { return d.bpm.averages[d.bpm.averages.length-1][0]; });
+  gridItem.exit().remove();
 
-  d3.select('.gridGroup')
-    .append('text')
-    .attr('class', 'minTime')
-    .text(new Date(minTime).getHours() + ':' + new Date(minTime).getMinutes());
+  gridItem.transition().duration(500);
 
-  d3.select('.gridGroup')
-    .append('text')
-    .attr('class', 'maxTime')
-    .text(new Date(maxTime).getHours() + ':' + new Date(maxTime).getMinutes());
+  gridItem
+    .enter()
+    .append('div')
+    .attr('class', 'gridItem')
+    .attr('id', function(d,i) { return 'itemID' + i })
+    .append('canvas')
+    .attr('width', widthCanvas)
+    .attr('height', heightCanvas)
+    .attr('id', function(d,i) { return 'canvasID' + i })
+    
 
-  timeScale.domain([ minTime, maxTime]);
+}
+
+function boxVis_live(data) {
 
   var gridItem = gridGroup.selectAll(".gridItem")
     .data(data, function(d,i) { return d.id; });
 
+  gridItem.exit().remove()
+  .call(function(d){
+    d._groups[0].forEach(function(g) {
+      $('.gridGroup').isotope( 'remove', $('#item'+g.id.substr(6)) );
+    })
+  });
+
+  gridItem.transition().duration(500);
 
   gridItem
     .enter()
@@ -190,24 +205,23 @@ function boxVis(data) {
     .attr('class', 'gridItem')
     .attr('id', function(d,i) { return 'itemID' + d.id })
     .append('canvas')
+    .attr('width', widthCanvas)
+    .attr('height', heightCanvas)
     .attr('id', function(d,i) { return 'canvasID' + d.id })
-    .attr('width', documentWidth)
-    .attr('height', heightCanvas);
-
-  Object.keys(data).forEach(function(k) {
-      if (data[k].bpm.averages.length >= 1) {
-          pulseGradient(data[k].bpm.averages,k,data[k].id);
-      }
-  });
-
+    .call(function(d){
+      d._groups[0].forEach(function(g) {
+        $('.gridGroup').isotope( 'insert', $('#item'+g.id.substr(6)) );
+      })
+    });
 
 }
 
-function initIsotope_live() {
+
+function initIsotope() {
 
   var $container = $('.gridGroup');
 
-  $('.gridGroup').isotope({
+  $container.isotope({
     // options
     itemSelector: '.gridItem',
     layoutMode: 'packery',
@@ -219,14 +233,14 @@ function initIsotope_live() {
     }
   });
 
-  $('.gridItem').click(function(){
+  $(document).on('click', ".gridItem", function(){
 
     var $this = $(this);
 
     if ($this.hasClass('big')) {
-      pulseGradientResize(this.__data__.bpm.averages,this.id.slice(6),widthCanvas,30);
+      pulseGradientResize(this.__data__.bpm.averages,this.id.slice(6),widthCanvas,heightCanvas);
     } else {
-      pulseGradientResize(this.__data__.bpm.averages,this.id.slice(6),documentWidth,400);
+      pulseGradientResize(this.__data__.bpm.averages,this.id.slice(6),316,316);
     }
 
     $this.toggleClass('big');
@@ -237,6 +251,7 @@ function initIsotope_live() {
 
     // bind sort button click
   $('.sort-by-button-group').on( 'click', 'button', function() {
+    $('.gridGroup').isotope('updateSortData', $('.gridItem'))
     var sortValue = $(this).attr('data-sort-value');
     $container.isotope({ sortBy: sortValue });
   });
@@ -281,15 +296,15 @@ function initIsotope_live() {
     });
   });
 
-
-
-
 }
 
 function pulseGradientResize(data,index,width,height) {
 
+  data.min =  data[0][1] - avgMIN;
+  data.avg =  data[0][2] - avgAVG;
+  data.max =  data[0][3] - avgMAX;
 
-  // document.getElementById('canvasID'+index).width = 316;
+  document.getElementById('canvasID'+index).width = width;
   document.getElementById('canvasID'+index).height = height;
 
   var c = document.getElementById("canvasID"+index);
@@ -297,77 +312,99 @@ function pulseGradientResize(data,index,width,height) {
 
   var grd = ctx.createLinearGradient(0,0,width,0);
 
-  grd.addColorStop(0,'rgb(0,0,0)');
-  grd.addColorStop(timeScale(data[0][0]),'rgb(0,0,0)');
+  if (data.min < minBPM) {
+    grd.addColorStop(0,'rgb(0,0,0)');
+  } else if (data.min > maxBPM) {
+    grd.addColorStop(0,'rgb(255,255,255)');
+  } else {
+    grd.addColorStop(0,color(data.min));
+  }
 
-  data.forEach(function(d,i) {
-    if (+d[2] < minBPM) {
-      grd.addColorStop(timeScale(+d[0]),'rgb(0,0,0)');
-    } else if (+d[2] > maxBPM) {
-      grd.addColorStop(timeScale(+d[0]),'rgb(255,255,255)');
-    } else {
-      grd.addColorStop(timeScale(+d[0]),color(+d[2]));
-    }
-  })
+  if (data.avg < minBPM) {
+    grd.addColorStop(.5,'rgb(0,0,0)');
+  } else if (data.avg > maxBPM) {
+    grd.addColorStop(.5,'rgb(255,255,255)');
+  } else {
+    grd.addColorStop(.5,color(data.avg));
+  }
+
+  if (data.max < minBPM) {
+    grd.addColorStop(1,'rgb(0,0,0)');
+  } else if (data.max > maxBPM) {
+    grd.addColorStop(1,'rgb(255,255,255)');
+  } else {
+    grd.addColorStop(1,color(data.max));
+  }
 
   ctx.fillStyle=grd;
   ctx.fillRect(0,0,width,height);
 
 }
 
-function pulseGradient(data,index,id) {
+function pulseGradient(data,index) {
 
-  d3.select('#itemID'+id).selectAll('text').remove();
+  data.min =  data.min - avgMIN;
+  data.avg =  data.avg - avgAVG;
+  data.max =  data.max - avgMAX;
 
-  var minAvg = d3.min(data, function(d) { return d[2]; });
+  d3.select('#itemID'+index).selectAll('text').remove();
 
-  d3.select('#itemID'+id)
+  d3.select('#itemID'+index)
     .append('text')
     .attr('class', 'minText')
-    .text(minAvg);
+    .text(Math.round(data.min));
 
-  var meanAvg = d3.mean(data, function(d) { return d[2]; });
-
-  d3.select('#itemID'+id)
+  d3.select('#itemID'+index)
     .append('text')
     .attr('class', 'avgText')
-    .text(Math.round(meanAvg));
+    .text(Math.round(data.avg));
 
-  var maxAvg = d3.mean(data, function(d) { return d[2]; });
-
-  d3.select('#itemID'+id)
+  d3.select('#itemID'+index)
     .append('text')
     .attr('class', 'maxText')
-    .text(Math.round(maxAvg));
+    .text(Math.round(data.max));
 
-  d3.select('#itemID'+id)
+  d3.select('#itemID'+index)
     .append('text')
     .attr('class', 'idText')
     .text('ID '+ index);
 
-  var c = document.getElementById("canvasID"+id);
+  widthCanvas = $('#itemID'+index).width();
+  heightCanvas = $('#itemID'+index).height();
 
-  var ctx = c.getContext("2d");
+  var c=document.getElementById("canvasID"+index);
+  var ctx=c.getContext("2d");
 
   var grd=ctx.createLinearGradient(0,0,widthCanvas,0);
 
-  grd.addColorStop(0,'rgb(0,0,0)');
-  grd.addColorStop(timeScale(data[0][0]),'rgb(0,0,0)');
+  // avgMIN, avgAVG, avgMAX;
 
-  data.forEach(function(d,i) {
-    if (+d[2] < minBPM) {
-      grd.addColorStop(timeScale(+d[0]),'rgb(0,0,0)');
-    } else if (+d[2] > maxBPM) {
-      grd.addColorStop(timeScale(+d[0]),'rgb(255,255,255)');
-    } else {
-      grd.addColorStop(timeScale(+d[0]),color(+d[2]));
-    }
-  })
+  if (data.min < minBPM) {
+    grd.addColorStop(0,'rgb(0,0,0)');
+  } else if (data.min > maxBPM) {
+    grd.addColorStop(0,'rgb(255,255,255)');
+  } else {
+    grd.addColorStop(0,color(data.min));
+  }
+
+  if (data.avg < minBPM) {
+    grd.addColorStop(.5,'rgb(0,0,0)');
+  } else if (data.avg > maxBPM) {
+    grd.addColorStop(.5,'rgb(255,255,255)');
+  } else {
+    grd.addColorStop(.5,color(data.avg));
+  }
+
+  if (data.max < minBPM) {
+    grd.addColorStop(1,'rgb(0,0,0)');
+  } else if (data.max > maxBPM) {
+    grd.addColorStop(1,'rgb(255,255,255)');
+  } else {
+    grd.addColorStop(1,color(data.max));
+  }
 
   ctx.fillStyle=grd;
   ctx.fillRect(0,0,widthCanvas,heightCanvas);
-
-  
 
 }
 
