@@ -154,7 +154,6 @@ socket.on('averages', function(data){
 initIsotope();
 
 
-
 var gridGroup = d3.select(".gridGroup");
 
 function boxVis_file(data) {
@@ -226,15 +225,14 @@ function initIsotope() {
     }
   });
 
-
-  $('.gridItem').click(function(){
+  $(document).on('click', ".gridItem", function(){
 
     var $this = $(this);
 
     if ($this.hasClass('big')) {
-      pulseGradientResize(this.__data__,this.id.slice(6),widthCanvas,heightCanvas);
+      pulseGradientResize(this.__data__.bpm.averages,this.id.slice(6),widthCanvas,heightCanvas);
     } else {
-      pulseGradientResize(this.__data__,this.id.slice(6),316,316);
+      pulseGradientResize(this.__data__.bpm.averages,this.id.slice(6),316,316);
     }
 
     $this.toggleClass('big');
@@ -294,16 +292,16 @@ function initIsotope() {
 
 function pulseGradientResize(data,index,width,height) {
 
-  document.getElementById('canvasID'+index).width = 316;
-  document.getElementById('canvasID'+index).height = 316;
+  document.getElementById('canvasID'+index).width = width;
+  document.getElementById('canvasID'+index).height = height;
 
   var c = document.getElementById("canvasID"+index);
   var ctx = c.getContext("2d");
 
-  var grd = ctx.createLinearGradient(0,0,width,0);
-  grd.addColorStop(0,color(data.min));
-  grd.addColorStop(.5,color(data.avg));
-  grd.addColorStop(1,color(data.max));
+  var grd = ctx.createLinearGradient(0,0,widthCanvas,0);
+  grd.addColorStop(0,color(data[0][1]));
+  grd.addColorStop(.5,color(data[0][2]));
+  grd.addColorStop(1,color(data[0][3]));
 
   ctx.fillStyle=grd;
   ctx.fillRect(0,0,width,height);
