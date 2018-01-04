@@ -301,31 +301,30 @@ function pulseGradientResize(data,index,width,height) {
   var c = document.getElementById("canvasID"+index);
   var ctx = c.getContext("2d");
 
-  var grd = ctx.createLinearGradient(0,0,widthCanvas,0);
+  var grd = ctx.createLinearGradient(0,0,width,0);
 
-
-  if (data[0][1] > minBPM && data[0][1] < maxBPM) {
-    grd.addColorStop(0,color(data[0][1]));
+  if (data[0][1] < minBPM) {
+    grd.addColorStop(0,'rgb(0,0,0)');
   } else if (data[0][1] > maxBPM) {
     grd.addColorStop(0,'rgb(255,255,255)');
   } else {
-    grd.addColorStop(0,'rgb(0,0,0)');
+    grd.addColorStop(0,color(data[0][1]));
   }
 
-  if (data[0][2] > minBPM && data[0][2] < maxBPM) {
-    grd.addColorStop(.5,color(data[0][2]));
+  if (data[0][2] < minBPM) {
+    grd.addColorStop(.5,'rgb(0,0,0)');
   } else if (data[0][2] > maxBPM) {
-    grd.addColorStop(0,'rgb(255,255,255)');
+    grd.addColorStop(.5,'rgb(255,255,255)');
   } else {
-    grd.addColorStop(0,'rgb(0,0,0)');
+    grd.addColorStop(.5,color(data[0][2]));
   }
 
-  if (data[0][3] > minBPM && data[0][3] < maxBPM) {
-    grd.addColorStop(1,color(data[0][3]));
+  if (data[0][3] < minBPM) {
+    grd.addColorStop(1,'rgb(0,0,0)');
   } else if (data[0][3] > maxBPM) {
-    grd.addColorStop(0,'rgb(255,255,255)');
+    grd.addColorStop(1,'rgb(255,255,255)');
   } else {
-    grd.addColorStop(0,'rgb(0,0,0)');
+    grd.addColorStop(1,color(data[0][3]));
   }
 
   ctx.fillStyle=grd;
@@ -357,33 +356,36 @@ function pulseGradient(data,index) {
     .attr('class', 'idText')
     .text('ID '+ index);
 
+  widthCanvas = $('#itemID'+index).width();
+  heightCanvas = $('#itemID'+index).height();
+
   var c=document.getElementById("canvasID"+index);
   var ctx=c.getContext("2d");
 
   var grd=ctx.createLinearGradient(0,0,widthCanvas,0);
 
-  if (data.min > minBPM && data.min < maxBPM) {
-    grd.addColorStop(0,color(data.min));
+  if (data.min < minBPM) {
+    grd.addColorStop(0,'rgb(0,0,0)');
   } else if (data.min > maxBPM) {
     grd.addColorStop(0,'rgb(255,255,255)');
   } else {
-    grd.addColorStop(0,'rgb(0,0,0)');
+    grd.addColorStop(0,color(data.min));
   }
 
-  if (data.avg > minBPM && data.avg < maxBPM) {
-    grd.addColorStop(.5,color(data.avg));
+  if (data.avg < minBPM) {
+    grd.addColorStop(.5,'rgb(0,0,0)');
   } else if (data.avg > maxBPM) {
-    grd.addColorStop(0,'rgb(255,255,255)');
+    grd.addColorStop(.5,'rgb(255,255,255)');
   } else {
-    grd.addColorStop(0,'rgb(0,0,0)');
+    grd.addColorStop(.5,color(data.avg));
   }
 
-  if (data.max > minBPM && data.max < maxBPM) {
-    grd.addColorStop(1,color(data.max));
+  if (data.max < minBPM) {
+    grd.addColorStop(1,'rgb(0,0,0)');
   } else if (data.max > maxBPM) {
-    grd.addColorStop(0,'rgb(255,255,255)');
+    grd.addColorStop(1,'rgb(255,255,255)');
   } else {
-    grd.addColorStop(0,'rgb(0,0,0)');
+    grd.addColorStop(1,color(data.max));
   }
 
   ctx.fillStyle=grd;
