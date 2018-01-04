@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+
 <script src="http://hoyh.nocompany.co/socket.io/socket.io.js"></script>
 <script src="/socket.io/socket.io.js"></script>
 <script>
@@ -16,51 +17,43 @@
     background: black;
     color: white;
     font-family: 'helvetica';
-    margin: 0px;
-  }
-
-  .button-group{
-    margin: 5px;
   }
 
   .gridItem{
-    padding: 0px;
-    padding-top: 4px;
-    width: 100%;
-    height: 30px;
-    font-size: 0px;
+    padding: 4px;
+    width: 100px;
+    height: 100px;
   }
 
   .gridItem.big {
-    width: 100%;
-    height: 400px;
-    font-size: 20px;
+    width: 316px;
+    height: 316px;
   }
 
   .idText{
     position: absolute;
-    right: 10px;
+    left: 10px;
     top: 10px;
     color: white;
-    font-size: 14px !important;
+    font-size: 10px;
   }
 
   .minText{
     position: absolute;
     left: 10px;
-    top: 10px;
+    bottom: 10px;
     color: white;
   }
   .avgText{
     position: absolute;
-    left: 10px;
-    top: 50%;
-    /*transform: translate(0,50%);*/
+    left: 50%;
+    bottom: 10px;
+    transform: translate(-50%,0);
     color: white;
   }
   .maxText{
     position: absolute;
-    left: 10px;
+    right: 10px;
     bottom: 10px;
     color: white;
   }
@@ -81,6 +74,8 @@
     <button class="button" data-sort-value="maxText">Max. Pulse</button>
 </div>
 
+<br>
+
 <div class="button-group filter-by-button-group js-radio-button-group">
   Filter by:
     <button id="filterNon" class="button" >Show all</button>
@@ -95,28 +90,26 @@
 
 <script>
 
-
-
-var documentWidth = window.innerWidth;
-
-var widthCanvas = documentWidth;
-var heightCanvas = 30;
+var widthCanvas = 100;
+var heightCanvas = 100;
 
 var color = d3.scaleSequential(d3.interpolateRainbow).domain([110, 60]);
 
+// interpolateViridis interpolatePlasma
+
+var gridHeight = 0;
+
 function loadData() {
 
-  d3.json("data/averages.json", function(data) {
-    boxVis(Object.values(data));
+  d3.csv("data/data01.csv", function(data) {
 
+    boxVis_file(data);
 
-    Object.keys(data)
-          .reverse()
-          .forEach(function(k){
-      pulseGradient(data[k].bpm.averages, data[k].id, data[k].id);
-    })
+    for (var i = data.length - 1; i >= 0; i--) {
+      pulseGradient(data[i],i);
+    }
 
-    initIsotope_live();
+    initIsotope();
 
   });
 
@@ -127,28 +120,69 @@ function loadData() {
 socket.on('connect', function () {
     console.log('### connected')
 
-    // get all averages sample for all devices currently online
-    socket.emit('get_averages', null, null)
+    // get last averages sample for all devices currently online
+    socket.emit('get_averages', null, "latest")
+    window.setInterval(function() {
+        socket.emit('get_averages', null, "latest")
+    }, 5000)
 });
 socket.on('averages', function(data){
     console.log('### averages',data)
 
-    boxVis(Object.values(data));
+    boxVis_live(Object.values(data));
 
+    Object.keys(data).forEach(function(k) {
+        if (data[k].bpm.averages.length >= 1) {
+            var entry = data[k].bpm.averages[0]
+            var d = {
+                min: entry[1],
+                avg: entry[2],
+                max: entry[3]
+            }
+            pulseGradient(d,k);
+        }
+    });
+    initIsotope();
 
-    initIsotope_live();
-
+    if (gridHeight < 100) {
+      gridHeight += 5;
+    } else {
+      gridHeight = 0;
+    }
+    
 })
 
 
 var gridGroup = d3.select(".gridGroup");
 
-function boxVis(data) {
-  console.log('data',data)
+function boxVis_file(data) {
+  var gridItem = gridGroup.selectAll(".gridItem")
+    .data(data, function(d,i) { return i; });
+
+  gridItem.exit().remove();
+
+  gridItem.transition().duration(500);
+
+  gridItem
+    .enter()
+    .append('div')
+    .attr('class', 'gridItem')
+    .attr('id', function(d,i) { return 'itemID' + i })
+    .append('canvas')
+    .attr('width', widthCanvas)
+    .attr('height', heightCanvas)
+    .attr('id', function(d,i) { return 'canvasID' + i });
+
+}
+
+function boxVis_live(data) {
+
   var gridItem = gridGroup.selectAll(".gridItem")
     .data(data, function(d,i) { return d.id; });
 
   gridItem.exit().remove();
+
+  gridItem.transition().duration(500);
 
   gridItem
     .enter()
@@ -156,20 +190,14 @@ function boxVis(data) {
     .attr('class', 'gridItem')
     .attr('id', function(d,i) { return 'itemID' + d.id })
     .append('canvas')
-    .attr('id', function(d,i) { return 'canvasID' + d.id })
-    .attr('width', documentWidth)
-    .attr('height', heightCanvas);
-
-  Object.keys(data).forEach(function(k) {
-      if (data[k].bpm.averages.length >= 1) {
-          pulseGradient(data[k].bpm.averages,k,data[k].id);
-      }
-  });
-
+    .attr('width', widthCanvas)
+    .attr('height', heightCanvas)
+    .attr('id', function(d,i) { return 'canvasID' + d.id });
 
 }
 
-function initIsotope_live() {
+
+function initIsotope() {
 
   var $container = $('.gridGroup');
 
@@ -190,9 +218,9 @@ function initIsotope_live() {
     var $this = $(this);
 
     if ($this.hasClass('big')) {
-      pulseGradientResize(this.__data__.bpm.averages,this.id.slice(6),widthCanvas,30);
+      pulseGradientResize(this.__data__,this.id.slice(6),widthCanvas,heightCanvas);
     } else {
-      pulseGradientResize(this.__data__.bpm.averages,this.id.slice(6),documentWidth,400);
+      pulseGradientResize(this.__data__,this.id.slice(6),316,316);
     }
 
     $this.toggleClass('big');
@@ -254,68 +282,56 @@ function initIsotope_live() {
 
 function pulseGradientResize(data,index,width,height) {
 
-
-  // document.getElementById('canvasID'+index).width = 316;
-  document.getElementById('canvasID'+index).height = 400;
+  document.getElementById('canvasID'+index).width = 316;
+  document.getElementById('canvasID'+index).height = 316;
 
   var c = document.getElementById("canvasID"+index);
   var ctx = c.getContext("2d");
 
   var grd = ctx.createLinearGradient(0,0,width,0);
-
-  data.forEach(function(d,i) {
-    grd.addColorStop(i/data.length,color(+d[2]));
-  })
+  grd.addColorStop(0,color(data.min));
+  grd.addColorStop(.5,color(data.avg));
+  grd.addColorStop(1,color(data.max));
 
   ctx.fillStyle=grd;
   ctx.fillRect(0,0,width,height);
 
 }
 
-function pulseGradient(data,index,id) {
+function pulseGradient(data,index) {
 
-  d3.select('#itemID'+id).selectAll('text').remove();
+  d3.select('#itemID'+index).selectAll('text').remove();
 
-  var minAvg = d3.min(data, function(d) { return d[2]; });
-
-  d3.select('#itemID'+id)
+  d3.select('#itemID'+index)
     .append('text')
     .attr('class', 'minText')
-    .text(minAvg);
+    .text(Math.round(data.min));
 
-  var meanAvg = d3.mean(data, function(d) { return d[2]; });
-
-  d3.select('#itemID'+id)
+  d3.select('#itemID'+index)
     .append('text')
     .attr('class', 'avgText')
-    .text(Math.round(meanAvg));
+    .text(Math.round(data.avg));
 
-  var maxAvg = d3.mean(data, function(d) { return d[2]; });
-
-  d3.select('#itemID'+id)
+  d3.select('#itemID'+index)
     .append('text')
     .attr('class', 'maxText')
-    .text(Math.round(maxAvg));
+    .text(Math.round(data.max));
 
-  d3.select('#itemID'+id)
+  d3.select('#itemID'+index)
     .append('text')
     .attr('class', 'idText')
     .text('ID '+ index);
 
-  var c = document.getElementById("canvasID"+id);
-
-  var ctx = c.getContext("2d");
+  var c=document.getElementById("canvasID"+index);
+  var ctx=c.getContext("2d");
 
   var grd=ctx.createLinearGradient(0,0,widthCanvas,0);
-
-  data.forEach(function(d,i) {
-    grd.addColorStop(i/data.length,color(+d[2]));
-  })
+  grd.addColorStop(0,color(data.min));
+  grd.addColorStop(.5,color(data.avg));
+  grd.addColorStop(1,color(data.max));
 
   ctx.fillStyle=grd;
-  ctx.fillRect(0,0,widthCanvas,heightCanvas);
-
-  
+  ctx.fillRect(0,gridHeight,widthCanvas,heightCanvas);
 
 }
 
