@@ -302,9 +302,7 @@ function pulseGradientResize(data,index,width,height) {
   var ctx = c.getContext("2d");
 
   var grd = ctx.createLinearGradient(0,0,widthCanvas,0);
-  // grd.addColorStop(0,color(data[0][1]));
-  // grd.addColorStop(.5,color(data[0][2]));
-  // grd.addColorStop(1,color(data[0][3]));
+
 
   if (data[0][1] > minBPM && data[0][1] < maxBPM) {
     grd.addColorStop(0,color(data[0][1]));
