@@ -115,7 +115,10 @@ var documentWidth = window.innerWidth;
 var widthCanvas = documentWidth;
 var heightCanvas = 30;
 
-var color = d3.scaleSequential(d3.interpolateRainbow).domain([110, 60]);
+var minBPM = 40;
+var maxBPM = 110;
+
+var color = d3.scaleSequential(d3.interpolateRainbow).domain([maxBPM, minBPM]);
 
 var parseTime = d3.timeFormat("%Q");
 
@@ -298,8 +301,10 @@ function pulseGradientResize(data,index,width,height) {
   grd.addColorStop(timeScale(data[0][0]),'rgb(0,0,0)');
 
   data.forEach(function(d,i) {
-    if (+d[2] < 40) {
+    if (+d[2] < minBPM) {
       grd.addColorStop(timeScale(+d[0]),'rgb(0,0,0)');
+    } else if (+d[2] > maxBPM) {
+      grd.addColorStop(timeScale(+d[0]),'rgb(255,255,255)');
     } else {
       grd.addColorStop(timeScale(+d[0]),color(+d[2]));
     }
@@ -350,8 +355,10 @@ function pulseGradient(data,index,id) {
   grd.addColorStop(timeScale(data[0][0]),'rgb(0,0,0)');
 
   data.forEach(function(d,i) {
-    if (+d[2] < 40) {
+    if (+d[2] < minBPM) {
       grd.addColorStop(timeScale(+d[0]),'rgb(0,0,0)');
+    } else if (+d[2] > maxBPM) {
+      grd.addColorStop(timeScale(+d[0]),'rgb(255,255,255)');
     } else {
       grd.addColorStop(timeScale(+d[0]),color(+d[2]));
     }
