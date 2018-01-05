@@ -14,15 +14,15 @@
 <style type="text/css">
 
   body{
-    background: rgb(30,30,30);
+    background: black;
     color: white;
     font-family: 'helvetica';
   }
 
   .gridItem{
     padding: 4px;
-/*    width: 100px;
-    height: 100px;*/
+    width: 100px;
+    height: 100px;
   }
 
   .gridItem.big {
@@ -35,7 +35,7 @@
     left: 10px;
     top: 10px;
     color: white;
-    font-size: 10px;
+    font-size: 0px;
   }
 
   .minText{
@@ -43,7 +43,6 @@
     left: 10px;
     bottom: 10px;
     color: white;
-    font-size: 0px;
   }
   .avgText{
     position: absolute;
@@ -58,7 +57,13 @@
     right: 10px;
     bottom: 10px;
     color: white;
-    font-size: 0px;
+  }
+  .itemGif{
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 100px;
+    height: 100px;
   }
 </style>
 </head>
@@ -72,9 +77,9 @@
 <div class="button-group sort-by-button-group js-radio-button-group">
   Sort by:
     <button class="button" data-sort-value="">ID</button>
-    <button class="button" data-sort-value="minText">Min. Pulse</button>
+    <!-- <button class="button" data-sort-value="minText">Min. Pulse</button> -->
     <button class="button" data-sort-value="avgText">Avg. Pulse</button>
-    <button class="button" data-sort-value="maxText">Max. Pulse</button>
+    <!-- <button class="button" data-sort-value="maxText">Max. Pulse</button> -->
 </div>
 
 <br>
@@ -82,9 +87,9 @@
 <div class="button-group filter-by-button-group js-radio-button-group">
   Filter by:
     <button id="filterNon" class="button" >Show all</button>
-    <button id="filterMin" class="button" >Min. Pulse < 70</button>
-    <button id="filterAvg" class="button" >Avg. Pulse 70 - 90</button>
-    <button id="filterMax" class="button" >Max. Pulse > 100</button>
+    <button id="filterMin" class="button" >Pulse < 70</button>
+    <button id="filterAvg" class="button" >Pulse 70 - 90</button>
+    <button id="filterMax" class="button" >Pulse > 100</button>
 </div>
 
 <br>
@@ -99,7 +104,7 @@ var heightCanvas = 100;
 var minBPM = 40;
 var maxBPM = 110;
 
-var color = d3.scaleSequential(d3.interpolateRainbow).domain([maxBPM, minBPM]);
+// var color = d3.scaleSequential(d3.interpolateRainbow).domain([maxBPM, minBPM]);
 
 // interpolateViridis interpolatePlasma
 
@@ -223,7 +228,6 @@ function initIsotope() {
     // options
     itemSelector: '.gridItem',
     layoutMode: 'packery',
-    transitionDuration: '5.0s',
     // stagger: 30,
     getSortData: {
       minText: '.minText parseInt',
@@ -232,21 +236,21 @@ function initIsotope() {
     }
   });
 
-  // $(document).on('click', ".gridItem", function(){
+  $(document).on('click', ".gridItem", function(){
 
-  //   var $this = $(this);
+    var $this = $(this);
 
-  //   if ($this.hasClass('big')) {
-  //     pulseGradientResize(this.__data__.bpm.averages,this.id.slice(6),widthCanvas,heightCanvas);
-  //   } else {
-  //     pulseGradientResize(this.__data__.bpm.averages,this.id.slice(6),316,316);
-  //   }
+    if ($this.hasClass('big')) {
+      pulseGradientResize(this.__data__.bpm.averages,this.id.slice(6),widthCanvas,heightCanvas);
+    } else {
+      pulseGradientResize(this.__data__.bpm.averages,this.id.slice(6),316,316);
+    }
 
-  //   $this.toggleClass('big');
+    $this.toggleClass('big');
 
-  //   $container.isotope( 'layout' )
+    $container.isotope( 'layout' )
 
-  // });
+  });
 
     // bind sort button click
   $('.sort-by-button-group').on( 'click', 'button', function() {
@@ -271,7 +275,7 @@ function initIsotope() {
   $( "#filterMin" ).click(function() {
     $container.isotope({
       filter: function() {
-        var number = $(this).find('.minText').text();
+        var number = $(this).find('.avgText').text();
         return parseInt( number, 10 ) < 70;
       }
     });
@@ -289,7 +293,7 @@ function initIsotope() {
   $( "#filterMax" ).click(function() {
     $container.isotope({
       filter: function() {
-        var number = $(this).find('.maxText').text();
+        var number = $(this).find('.avgText').text();
         return parseInt( number, 10 ) > 100;
       }
     });
@@ -338,12 +342,22 @@ function pulseGradientResize(data,index,width,height) {
 
 function pulseGradient(data,index) {
 
+  if ($('#itemID'+index+' > .avgText').text() != data.avg) {
+
+      d3.select('#itemID'+index).select('img').remove();
+
+      if (data.avg >= 1 && data.avg < 200) {
+
+        d3.select('#itemID'+index)
+          .append('img')
+          .attr('class', 'itemGif')
+          .attr('src', 'images/07-bw-grad/v01_bpm_'+Math.round(data.avg)+'.gif');
+
+      }
+  }
+
   d3.select('#itemID'+index).selectAll('text').remove();
 
-  d3.select('#itemID'+index)
-    .append('text')
-    .attr('class', 'minText')
-    .text(Math.round(data.min));
 
   d3.select('#itemID'+index)
     .append('text')
@@ -352,75 +366,44 @@ function pulseGradient(data,index) {
 
   d3.select('#itemID'+index)
     .append('text')
-    .attr('class', 'maxText')
-    .text(Math.round(data.max));
+    .attr('class', 'idText')
+    .text('ID '+ index);
 
 
-  widthCanvas = Math.round(data.avg)+50;
-  heightCanvas = Math.round((data.max - data.min)+50);
+  // widthCanvas = $('#itemID'+index).width();
+  // heightCanvas = $('#itemID'+index).height();
 
-  if (widthCanvas > 75) {
-    d3.select('#itemID'+index)
-      .append('text')
-      .attr('class', 'idText')
-      .text('ID '+ index);
-  }
+  // var c=document.getElementById("canvasID"+index);
+  // var ctx=c.getContext("2d");
 
-  d3.select('#itemID'+index)
-    .transition()
-    .duration(5000)
-    .style('width', widthCanvas+'px');
+  // var grd=ctx.createLinearGradient(0,0,widthCanvas,0);
 
-  d3.select('#itemID'+index)
-    .transition()
-    .duration(5000)
-    .style('height', heightCanvas+'px');
+  // if (data.min < minBPM) {
+  //   grd.addColorStop(0,'rgb(0,0,0)');
+  // } else if (data.min > maxBPM) {
+  //   grd.addColorStop(0,'rgb(255,255,255)');
+  // } else {
+  //   grd.addColorStop(0,color(data.min));
+  // }
 
-  d3.select('#canvasID'+index)
-    // .transition()
-    // .duration(5000)
-    .attr('width', widthCanvas+'px');
+  // if (data.avg < minBPM) {
+  //   grd.addColorStop(.5,'rgb(0,0,0)');
+  // } else if (data.avg > maxBPM) {
+  //   grd.addColorStop(.5,'rgb(255,255,255)');
+  // } else {
+  //   grd.addColorStop(.5,color(data.avg));
+  // }
 
-  d3.select('#canvasID'+index)
-    // .transition()
-    // .duration(5000)
-    .attr('height', heightCanvas+'px');
+  // if (data.max < minBPM) {
+  //   grd.addColorStop(1,'rgb(0,0,0)');
+  // } else if (data.max > maxBPM) {
+  //   grd.addColorStop(1,'rgb(255,255,255)');
+  // } else {
+  //   grd.addColorStop(1,color(data.max));
+  // }
 
-  $('.gridGroup').isotope( 'layout' )
-
-  var c=document.getElementById("canvasID"+index);
-  var ctx=c.getContext("2d");
-
-  ctx.clearRect(0,0,1000,1000);
-
-  var grd=ctx.createLinearGradient(0,0,widthCanvas,0);
-
-  if (data.min < minBPM) {
-    grd.addColorStop(0,'rgb(0,0,0)');
-  } else if (data.min > maxBPM) {
-    grd.addColorStop(0,'rgb(255,255,255)');
-  } else {
-    grd.addColorStop(0,color(data.min));
-  }
-
-  if (data.avg < minBPM) {
-    grd.addColorStop(.5,'rgb(0,0,0)');
-  } else if (data.avg > maxBPM) {
-    grd.addColorStop(.5,'rgb(255,255,255)');
-  } else {
-    grd.addColorStop(.5,color(data.avg));
-  }
-
-  if (data.max < minBPM) {
-    grd.addColorStop(1,'rgb(0,0,0)');
-  } else if (data.max > maxBPM) {
-    grd.addColorStop(1,'rgb(255,255,255)');
-  } else {
-    grd.addColorStop(1,color(data.max));
-  }
-
-  ctx.fillStyle=grd;
-  ctx.fillRect(0,0,widthCanvas,heightCanvas);
+  // ctx.fillStyle=grd;
+  // ctx.fillRect(0,0,widthCanvas,heightCanvas);
 
 }
 
