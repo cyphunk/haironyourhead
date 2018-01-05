@@ -14,8 +14,8 @@ extern "C"{
 }
 #include <ESP8266WiFi.h>
 #include "credentials.h"  //ignored by git to keep the network details private, add lines below into the file
-                          // const char* ssid = "your-network-name";
-                          // const char* password = "password";
+#include "devices.h"
+
 #include <WiFiUdp.h>
 #include <ESP8266mDNS.h>
 #include <ArduinoOTA.h>
@@ -83,6 +83,7 @@ char osc_header_gsr[10];
 bool led_status = 1;   // 1 led OFF, 0 led ON
 int destination = 255; //last octet of IP OSC destination machine. 255=broadcast default
 IPAddress remoteIP;    //dynamically created based on device IP + destination
+IPAddress deviceip;
 int unit_ID;
 
 int i2c_adc_address = 0x48;         //0x48 (1001000) ADR -> GND
@@ -145,8 +146,29 @@ if (Wire.endTransmission() == 0) {external_adac_present = 1;}
 #endif
 
 //---------------------------- WiFi --------------------------------------------
+// determine IP address based on devices.h definitions
+  int chip_id = ESP.getChipId();
+  const device_details *device = devices;
+  for (; device->esp_chip_id != 0; device++) {
+    //Serial.printf("chip_id %X = %X?\n", chip_id, device->esp_chip_id);
+    if (device->esp_chip_id == chip_id)
+      break;
+  }
+  if (device->esp_chip_id == 0) {
+    while(1) { 
+      if (!Serial) Serial.begin(SERIAL_SPEED);
+      Serial.println("Could not obtain a chipId we know. Means we dont know what id/IP address to asign. Fail");
+      Serial.printf("This ESP8266 Chip id = 0x%08X\n", chip_id);
+      digitalWrite(BUILD_IN_LED, HIGH); delay(500); digitalWrite(BUILD_IN_LED, LOW); 
+    }
+  }
+  //Serial.printf("This Device ID/IP %i\n", device->id);
+  deviceip = IPAddress(gateway);
+  deviceip[3] = device->id;
+  //Serial.print("IP: "); Serial.println(deviceip);
+
 WiFi.mode(WIFI_STA);  // https://www.arduino.cc/en/Reference/WiFiConfig
-// WiFi.config(ip, gateway, subnet);  //uncomment for fixed ip address, needs to be defined in credentials.h file
+WiFi.config(deviceip, gateway, subnet);  //uncomment for fixed ip address, needs to be defined in credentials.h file
 
 #ifdef SERIAL_DEBUG
   Serial.print("unit MAC address: "); Serial.println(WiFi.macAddress());
