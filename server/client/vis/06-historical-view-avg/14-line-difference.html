@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="http://hoyh.nocompany.co/socket.io/socket.io.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    if (window.location.href.indexOf('file://')>=0)
+        var socket = io.connect('http://hoyh.nocompany.co');
+    else
+        var socket = io.connect('');
+</script>
+
+<style type="text/css">
+
+  body{
+    background: white;
+    color: white;
+    font-family: 'helvetica';
+    margin: 0px;
+  }
+
+  .button-group{
+    margin: 5px;
+  }
+
+  .gridItem{
+    padding: 0px;
+    padding-top: 4px;
+    width: 100%;
+    height: 20px;
+    font-size: 0px;
+  }
+
+  .gridItem.big {
+    width: 100%;
+    height: 400px;
+    font-size: 20px;
+  }
+
+  .idText{
+    position: absolute;
+    right: 10px;
+    top: 7px;
+    color: white;
+    font-size: 14px !important;
+  }
+
+  .minText{
+    position: absolute;
+    left: 10px;
+    top: 10px;
+    color: white;
+  }
+  .avgText{
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    /*transform: translate(0,50%);*/
+    color: white;
+  }
+  .maxText{
+    position: absolute;
+    left: 10px;
+    bottom: 10px;
+    color: white;
+  }
+  .minTime{
+    position: absolute;
+    left: 10px;
+    top: -15px;
+    color: white;
+  }
+  .maxTime{
+    position: absolute;
+    right: 10px;
+    top: -15px;
+    color: white;
+  }
+
+  .line {
+    fill: none;
+    stroke: steelblue;
+    stroke-width: 2px;
+  }
+</style>
+</head>
+<body>
+
+<script src="js/d3.v4.min.js" type="text/javascript" ></script>
+<script src="js/jquery.min.js" type="text/javascript" ></script>
+
+
+<div class="gridGroup"></div>
+
+<script>
+
+
+
+var documentWidth = window.innerWidth;
+var documentHeight = window.innerHeight;
+
+var widthCanvas = documentWidth;
+var heightCanvas = 20;
+
+var margin = {top: 200, right: 0, bottom: 30, left: 0},
+    width = documentWidth - margin.left - margin.right,
+    height = documentHeight - margin.top - margin.bottom;
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+var minBPM = -50;
+var maxBPM = +50;
+
+var color = d3.scaleSequential(d3.interpolateRainbow).domain([maxBPM, minBPM]);
+
+var parseTime = d3.timeFormat("%Q");
+
+var timeScale = d3.scaleLinear().range([0, width]).domain([0,200]);
+
+var yScale = d3.scaleLinear().range([height, 0]).domain([-100,100]);
+
+var minTime = 0;
+var maxTime = 0;
+
+var avgData;
+
+var line = d3.line()
+    // .interpolate("basis")
+    .x(function(d,i) { return (i*5); })
+    .y(function(d) { return yScale(+d[2]); });
+
+
+socket.on('connect', function () {
+    console.log('### connected')
+
+    // get all averages sample for all devices currently online
+    socket.emit('get_averages', null, null)
+});
+socket.on('averages', function(data){
+    console.log('### averages',data);
+
+    avgData = data.device_0.bpm.averages;
+
+    boxVis(Object.values(data));
+
+})
+
+
+var gridGroup = d3.select(".gridGroup");
+
+function boxVis(data) {
+
+  minTime = d3.min(data, function(d) { return d.bpm.averages[0][0]; });
+  maxTime = d3.max(data, function(d) { return d.bpm.averages[d.bpm.averages.length-1][0]; });
+
+  d3.select('.gridGroup')
+    .append('text')
+    .attr('class', 'minTime')
+    .text(new Date(minTime).getHours() + ':' + new Date(minTime).getMinutes());
+
+  d3.select('.gridGroup')
+    .append('text')
+    .attr('class', 'maxTime')
+    .text(new Date(maxTime).getHours() + ':' + new Date(maxTime).getMinutes());
+
+  timeScale.domain([ minTime, maxTime]);
+
+
+  Object.keys(data).forEach(function(k) {
+      if (data[k].bpm.averages.length >= 1) {
+          pulseGradient(data[k].bpm.averages,k,data[k].id);
+      }
+  });
+
+}
+
+
+function pulseGradient(data,index,id) {
+
+  var avgPos = avgData.length - data.length;
+
+  if (avgPos < 0) {
+    data = data.slice(Math.abs(avgPos));
+  }
+
+  data.forEach(function(d,i) {
+    d[2] = +d[2] - avgData[i+avgPos][2]
+  });
+
+  svg.append("path")
+      .data([data])
+      .attr("class", "line")
+      .attr("d", line);
+
+  // d3.select('#itemID'+id).selectAll('text').remove();
+
+  // var minAvg = d3.min(data, function(d) { return d[2]; }) - d3.min(avgData, function(d) { return d[2]; });
+
+  // d3.select('#itemID'+id)
+  //   .append('text')
+  //   .attr('class', 'minText')
+  //   .text(minAvg);
+
+  // var meanAvg = d3.mean(data, function(d) { return d[2]; }) - d3.mean(avgData, function(d) { return d[2]; });
+
+  // d3.select('#itemID'+id)
+  //   .append('text')
+  //   .attr('class', 'avgText')
+  //   .text(Math.round(meanAvg));
+
+  // var maxAvg = d3.max(data, function(d) { return d[2]; }) - d3.max(avgData, function(d) { return d[2]; });
+
+  // d3.select('#itemID'+id)
+  //   .append('text')
+  //   .attr('class', 'maxText')
+  //   .text(Math.round(maxAvg));
+
+  // d3.select('#itemID'+id)
+  //   .append('text')
+  //   .attr('class', 'idText')
+  //   .text('ID '+ index);
+
+  // var c = document.getElementById("canvasID"+id);
+
+  // var ctx = c.getContext("2d");
+
+  // var grd=ctx.createLinearGradient(0,0,widthCanvas,0);
+
+  // grd.addColorStop(0,'rgb(0,0,0)');
+  // grd.addColorStop(timeScale(data[0][0]),'rgb(0,0,0)');
+
+  // data.forEach(function(d,i) {
+  //   if ((+d[2] - avgData[i+avgPos][2]) < minBPM) {
+  //     grd.addColorStop(timeScale(+d[0]),'rgb(0,0,0)');
+  //   } else if ((+d[2] - avgData[i+avgPos][2]) > maxBPM) {
+  //     grd.addColorStop(timeScale(+d[0]),'rgb(255,255,255)');
+  //   } else {
+  //     grd.addColorStop(timeScale(+d[0]),color((+d[2] - avgData[i+avgPos][2])));
+  //   }
+  // })
+
+  // ctx.fillStyle=grd;
+  // ctx.fillRect(0,0,widthCanvas,heightCanvas);
+
+  
+
+}
+
+</script>
+
+</body>
+</html>
