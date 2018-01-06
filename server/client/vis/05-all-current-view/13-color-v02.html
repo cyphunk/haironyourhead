@@ -83,6 +83,7 @@
 <div class="button-group filter-by-button-group js-radio-button-group">
   Filter by:
     <button id="filterNon" class="button" >Show all</button>
+    <button id="filterNoAvg" class="button" >No Average</button>
     <button id="filterMin" class="button" >Min. Pulse < 70</button>
     <button id="filterAvg" class="button" >Avg. Pulse 70 - 90</button>
     <button id="filterMax" class="button" >Max. Pulse > 100</button>
@@ -213,6 +214,15 @@ function boxVis_live(data) {
       })
     });
 
+  setTimeout(function() {
+    $('.gridGroup').isotope({
+      filter: function() {
+        var number = $(this).find('.idText').text();
+        return number !== 'ID 0';
+      }
+    });
+  }, 50);
+
 }
 
 
@@ -224,7 +234,6 @@ function initIsotope() {
     // options
     itemSelector: '.gridItem',
     layoutMode: 'packery',
-    // stagger: 30,
     getSortData: {
       minText: '.minText parseInt',
       avgText: '.avgText parseInt',
@@ -268,6 +277,15 @@ function initIsotope() {
     $container.isotope({ filter: '*' })
   });
 
+  $( "#filterNoAvg" ).click(function() {
+    $container.isotope({
+      filter: function() {
+        var number = $(this).find('.idText').text();
+        return number !== 'ID 0';
+      }
+    });
+  });
+
   $( "#filterMin" ).click(function() {
     $container.isotope({
       filter: function() {
@@ -276,6 +294,7 @@ function initIsotope() {
       }
     });
   });
+
 
   $( "#filterAvg" ).click(function() {
     $container.isotope({
