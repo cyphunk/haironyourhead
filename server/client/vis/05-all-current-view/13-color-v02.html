@@ -36,27 +36,31 @@
     top: 10px;
     color: white;
     font-size: 10px;
+    background-color: black; 
+    border-left: 2px solid black;
+    border-right: 2px solid black;
   }
 
   .minText{
     position: absolute;
     left: 10px;
     bottom: 10px;
-    color: white;
+    color: black;
   }
   .avgText{
     position: absolute;
     left: 50%;
     bottom: 10px;
     transform: translate(-50%,0);
-    color: white;
+    color: black;
   }
   .maxText{
     position: absolute;
     right: 10px;
     bottom: 10px;
-    color: white;
+    color: black;
   }
+
 </style>
 </head>
 <body>
@@ -354,7 +358,7 @@ function pulseGradient(data,index) {
   d3.select('#itemID'+index)
     .append('text')
     .attr('class', 'idText')
-    .text('ID '+ index);
+    .text('ID '+ index.substr(7));
 
   widthCanvas = $('#itemID'+index).width();
   heightCanvas = $('#itemID'+index).height();
