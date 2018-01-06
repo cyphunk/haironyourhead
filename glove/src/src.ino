@@ -31,7 +31,7 @@ extern "C"{
 WiFiUDP Udp;
 OSCErrorCode error;
 
-int report_interval = 3000;      //OSC report inerval 3 secs
+int report_interval = 20000;      //OSC report inerval 3 secs
 int measurment_interval = 50;       //AD measurment inerval
 unsigned long previousMillisReport = 0;
 unsigned long previousMillisMeasurment = 0;
