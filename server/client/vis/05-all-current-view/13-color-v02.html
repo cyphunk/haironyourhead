@@ -36,27 +36,34 @@
     top: 10px;
     color: white;
     font-size: 10px;
+    background-color: black; 
+    border-left: 2px solid black;
+    border-right: 2px solid black;
   }
 
   .minText{
     position: absolute;
     left: 10px;
     bottom: 10px;
-    color: white;
+    color: black;
   }
   .avgText{
     position: absolute;
     left: 50%;
     bottom: 10px;
     transform: translate(-50%,0);
-    color: white;
+    color: black;
   }
   .maxText{
     position: absolute;
     right: 10px;
     bottom: 10px;
-    color: white;
+    color: black;
   }
+  #itemIDdevice_0{
+    border: 1px solid white;
+  }
+
 </style>
 </head>
 <body>
@@ -79,6 +86,7 @@
 <div class="button-group filter-by-button-group js-radio-button-group">
   Filter by:
     <button id="filterNon" class="button" >Show all</button>
+    <button id="filterNoAvg" class="button" >No Average</button>
     <button id="filterMin" class="button" >Min. Pulse < 70</button>
     <button id="filterAvg" class="button" >Avg. Pulse 70 - 90</button>
     <button id="filterMax" class="button" >Max. Pulse > 100</button>
@@ -209,6 +217,15 @@ function boxVis_live(data) {
       })
     });
 
+  setTimeout(function() {
+    $('.gridGroup').isotope({
+      filter: function() {
+        var number = $(this).find('.idText').text();
+        return number !== 'ID 0';
+      }
+    });
+  }, 50);
+
 }
 
 
@@ -220,7 +237,6 @@ function initIsotope() {
     // options
     itemSelector: '.gridItem',
     layoutMode: 'packery',
-    // stagger: 30,
     getSortData: {
       minText: '.minText parseInt',
       avgText: '.avgText parseInt',
@@ -264,6 +280,15 @@ function initIsotope() {
     $container.isotope({ filter: '*' })
   });
 
+  $( "#filterNoAvg" ).click(function() {
+    $container.isotope({
+      filter: function() {
+        var number = $(this).find('.idText').text();
+        return number !== 'ID 0';
+      }
+    });
+  });
+
   $( "#filterMin" ).click(function() {
     $container.isotope({
       filter: function() {
@@ -272,6 +297,7 @@ function initIsotope() {
       }
     });
   });
+
 
   $( "#filterAvg" ).click(function() {
     $container.isotope({
@@ -354,7 +380,7 @@ function pulseGradient(data,index) {
   d3.select('#itemID'+index)
     .append('text')
     .attr('class', 'idText')
-    .text('ID '+ index);
+    .text('ID '+ index.substr(7));
 
   widthCanvas = $('#itemID'+index).width();
   heightCanvas = $('#itemID'+index).height();

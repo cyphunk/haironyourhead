@@ -28,6 +28,7 @@ var Timer      = require('./Timer.js') // simple timer to do something when N ti
 var Group      = require('./Group.js') // BPM, Device information storage a BPM detection
 var osc        = require('node-osc'); // used to send OSC messages from web admin to devices
 var OSCListener = require('./OSCListener.js'); // creates our OSC server to listen for pulses
+var serveIndex = require('serve-index')
 
 var os         = require('os');
 var program    = require('commander');
@@ -242,7 +243,7 @@ app.use('/', express.static(__dirname + '/client'));
 //     res.setHeader('Content-Type', 'application/json');
 //     res.send(JSON.stringify(show.devices[req.params.device_id]));
 // });
-
+app.use('/vis', express.static('client/vis'), serveIndex('client/vis', {'icons': true}))
 
 var oscserver = new OSCListener.Server(oscport);
 

@@ -8,12 +8,13 @@
   },
   "dependencies": {
     "commander": "^2.12.2",
+    "debug": "^2.6.9",
     "express": "^4.16.2",
     "expressjs": "^1.0.1",
-    "socket.io": "^0.9.19",
     "multer": "^1.3.0",
     "node-osc": "^0.2.1",
-    "debug": "^2.6.9"
+    "serve-index": "^1.9.1",
+    "socket.io": "^0.9.19"
   },
   "devDependencies": {},
   "scripts": {

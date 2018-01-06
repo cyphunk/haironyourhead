@@ -36,26 +36,32 @@
     top: 10px;
     color: white;
     font-size: 10px;
+    background-color: black; 
+    border-left: 2px solid black;
+    border-right: 2px solid black;
   }
 
   .minText{
     position: absolute;
     left: 10px;
     bottom: 10px;
-    color: white;
+    color: black;
   }
   .avgText{
     position: absolute;
     left: 50%;
     bottom: 10px;
     transform: translate(-50%,0);
-    color: white;
+    color: black;
   }
   .maxText{
     position: absolute;
     right: 10px;
     bottom: 10px;
-    color: white;
+    color: black;
+  }
+  #itemIDdevice_0{
+    border: 1px solid white;
   }
 </style>
 </head>
@@ -79,9 +85,9 @@
 <div class="button-group filter-by-button-group js-radio-button-group">
   Filter by:
     <button id="filterNon" class="button" >Show all</button>
-    <button id="filterMin" class="button" >Min. Pulse < 70</button>
-    <button id="filterAvg" class="button" >Avg. Pulse 70 - 90</button>
-    <button id="filterMax" class="button" >Max. Pulse > 100</button>
+    <button id="filterMin" class="button" >+/- 10 from AVG</button>
+    <button id="filterAvg" class="button" >+/- 20 from AVG</button>
+    <button id="filterMax" class="button" >Outliers (20 +/-)</button>
 </div>
 
 <br>
@@ -272,8 +278,8 @@ function initIsotope() {
   $( "#filterMin" ).click(function() {
     $container.isotope({
       filter: function() {
-        var number = $(this).find('.minText').text();
-        return parseInt( number, 10 ) < 70;
+        var number = $(this).find('.avgText').text();
+        return parseInt( number, 10 ) < 10 && parseInt( number, 10 ) > -10;
       }
     });
   });
@@ -282,7 +288,7 @@ function initIsotope() {
     $container.isotope({
       filter: function() {
         var number = $(this).find('.avgText').text();
-        return parseInt( number, 10 ) > 70 && parseInt( number, 10 ) < 90;
+        return parseInt( number, 10 ) < 20 && parseInt( number, 10 ) > -20;
       }
     });
   });
@@ -291,7 +297,7 @@ function initIsotope() {
     $container.isotope({
       filter: function() {
         var number = $(this).find('.maxText').text();
-        return parseInt( number, 10 ) > 100;
+        return parseInt( number, 10 ) > 20 && parseInt( number, 10 ) < -20;
       }
     });
   });
@@ -367,7 +373,7 @@ function pulseGradient(data,index) {
   d3.select('#itemID'+index)
     .append('text')
     .attr('class', 'idText')
-    .text('ID '+ index);
+    .text('ID '+ index.substr(7));
 
   widthCanvas = $('#itemID'+index).width();
   heightCanvas = $('#itemID'+index).height();
