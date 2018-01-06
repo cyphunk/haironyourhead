@@ -382,7 +382,8 @@ function packets_per_second(packets_total) {
 
      });
      app.use('/runtestbegin', (req, res) => {
-         exec('cd ./test/osc_player/ && timeout 20m ./run4.sh >/dev/null &', (err, stdout, stderr) => {});
+       exec('cd ./test/osc_player/ && timeout 20m ./run.sh >/dev/null &', (err, stdout, stderr) => {});
+       // exec('cd ./test/osc_player/ && timeout 20m ./run4.sh >/dev/null &', (err, stdout, stderr) => {});
          res.redirect('back');
      });
      app.use('/runtestend', (req, res) => {
