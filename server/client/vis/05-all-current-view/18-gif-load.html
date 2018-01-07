@@ -2,7 +2,7 @@
 <html>
 <head>
 
-<!-- <script src="http://hoyh.nocompany.co/socket.io/socket.io.js"></script> -->
+<script src="http://hoyh.nocompany.co/socket.io/socket.io.js"></script>
 <script src="/socket.io/socket.io.js"></script>
 <script>
     if (window.location.href.indexOf('file://')>=0)
@@ -35,7 +35,10 @@
     left: 10px;
     top: 10px;
     color: white;
-    font-size: 0px;
+    font-size: 10px;
+    background-color: black; 
+    border-left: 2px solid black;
+    border-right: 2px solid black;
   }
 
   .minText{
@@ -367,43 +370,8 @@ function pulseGradient(data,index) {
   d3.select('#itemID'+index)
     .append('text')
     .attr('class', 'idText')
-    .text('ID '+ index);
+    .text('ID '+ index.substr(7));
 
-
-  // widthCanvas = $('#itemID'+index).width();
-  // heightCanvas = $('#itemID'+index).height();
-
-  // var c=document.getElementById("canvasID"+index);
-  // var ctx=c.getContext("2d");
-
-  // var grd=ctx.createLinearGradient(0,0,widthCanvas,0);
-
-  // if (data.min < minBPM) {
-  //   grd.addColorStop(0,'rgb(0,0,0)');
-  // } else if (data.min > maxBPM) {
-  //   grd.addColorStop(0,'rgb(255,255,255)');
-  // } else {
-  //   grd.addColorStop(0,color(data.min));
-  // }
-
-  // if (data.avg < minBPM) {
-  //   grd.addColorStop(.5,'rgb(0,0,0)');
-  // } else if (data.avg > maxBPM) {
-  //   grd.addColorStop(.5,'rgb(255,255,255)');
-  // } else {
-  //   grd.addColorStop(.5,color(data.avg));
-  // }
-
-  // if (data.max < minBPM) {
-  //   grd.addColorStop(1,'rgb(0,0,0)');
-  // } else if (data.max > maxBPM) {
-  //   grd.addColorStop(1,'rgb(255,255,255)');
-  // } else {
-  //   grd.addColorStop(1,color(data.max));
-  // }
-
-  // ctx.fillStyle=grd;
-  // ctx.fillRect(0,0,widthCanvas,heightCanvas);
 
 }
 

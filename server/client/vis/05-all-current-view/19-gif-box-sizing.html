@@ -2,8 +2,8 @@
 <html>
 <head>
 
-<!-- <script src="http://hoyh.nocompany.co/socket.io/socket.io.js"></script> -->
-<script src="/socket.io/socket.io.js"></script>
+<script src="http://hoyh.nocompany.co/socket.io/socket.io.js"></script>
+<!-- <script src="/socket.io/socket.io.js"></script> -->
 <script>
     if (window.location.href.indexOf('file://')>=0)
         var socket = io.connect('http://hoyh.nocompany.co');
@@ -35,7 +35,10 @@
     left: 10px;
     top: 10px;
     color: white;
-    font-size: 0px;
+    font-size: 10px;
+    background-color: black; 
+    border-left: 2px solid black;
+    border-right: 2px solid black;
   }
 
   .minText{
@@ -368,7 +371,7 @@ function pulseGradient(data,index) {
   d3.select('#itemID'+index)
     .append('text')
     .attr('class', 'idText')
-    .text('ID '+ index);
+    .text('ID '+ index.substr(7));
 
   widthCanvas = Math.round(data.avg)+50;
   heightCanvas = Math.round((data.max - data.min)+50);

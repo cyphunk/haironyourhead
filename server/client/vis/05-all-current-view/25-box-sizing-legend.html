@@ -14,15 +14,15 @@
 <style type="text/css">
 
   body{
-    background: black;
+    background: rgb(0,0,0);
     color: white;
     font-family: 'helvetica';
   }
 
   .gridItem{
     padding: 4px;
-    width: 100px;
-    height: 100px;
+/*    width: 100px;
+    height: 100px;*/
   }
 
   .gridItem.big {
@@ -64,6 +64,24 @@
     border: 1px solid white;
   }
 
+  .legendContainer{
+    width: 100%;
+    position: relative;
+  }
+  #legend{
+    
+    width: 100%;
+    height: 15px;
+  }
+  .axis path,
+  .axis line {
+    fill: none;
+    stroke: none;
+  }
+  .axis text {
+    fill: #fff;
+    font-size: 12px;
+  }
 </style>
 </head>
 <body>
@@ -76,9 +94,7 @@
 <div class="button-group sort-by-button-group js-radio-button-group">
   Sort by:
     <button class="button" data-sort-value="">ID</button>
-    <button class="button" data-sort-value="minText">Min. Pulse</button>
     <button class="button" data-sort-value="avgText">Avg. Pulse</button>
-    <button class="button" data-sort-value="maxText">Max. Pulse</button>
 </div>
 
 <br>
@@ -86,10 +102,15 @@
 <div class="button-group filter-by-button-group js-radio-button-group">
   Filter by:
     <button id="filterNon" class="button" >Show all</button>
-    <button id="filterNoAvg" class="button" >No Average</button>
-    <button id="filterMin" class="button" >Min. Pulse < 70</button>
-    <button id="filterAvg" class="button" >Avg. Pulse 70 - 90</button>
-    <button id="filterMax" class="button" >Max. Pulse > 100</button>
+    <button id="filterMin" class="button" >Pulse < 70</button>
+    <button id="filterAvg" class="button" >Pulse 70 - 90</button>
+    <button id="filterMax" class="button" >Pulse > 100</button>
+</div>
+
+<br>
+
+<div class="legendContainer">
+  <canvas id="legend" width="100%" height="15" ></canvas>
 </div>
 
 <br>
@@ -102,9 +123,9 @@ var widthCanvas = 100;
 var heightCanvas = 100;
 
 var minBPM = 40;
-var maxBPM = 110;
+var maxBPM = 140;
 
-var color = d3.scaleSequential(d3.interpolateRainbow).domain([maxBPM, minBPM]);
+var color = d3.scaleSequential(d3.interpolateRainbow).domain([maxBPM+20 , minBPM]);
 
 // interpolateViridis interpolatePlasma
 
@@ -217,15 +238,6 @@ function boxVis_live(data) {
       })
     });
 
-  setTimeout(function() {
-    $('.gridGroup').isotope({
-      filter: function() {
-        var number = $(this).find('.idText').text();
-        return number !== 'ID 0';
-      }
-    });
-  }, 50);
-
 }
 
 
@@ -237,6 +249,8 @@ function initIsotope() {
     // options
     itemSelector: '.gridItem',
     layoutMode: 'packery',
+    transitionDuration: '3.0s',
+    // stagger: 30,
     getSortData: {
       minText: '.minText parseInt',
       avgText: '.avgText parseInt',
@@ -244,21 +258,21 @@ function initIsotope() {
     }
   });
 
-  $(document).on('click', ".gridItem", function(){
+  // $(document).on('click', ".gridItem", function(){
 
-    var $this = $(this);
+  //   var $this = $(this);
 
-    if ($this.hasClass('big')) {
-      pulseGradientResize(this.__data__.bpm.averages,this.id.slice(6),widthCanvas,heightCanvas);
-    } else {
-      pulseGradientResize(this.__data__.bpm.averages,this.id.slice(6),316,316);
-    }
+  //   if ($this.hasClass('big')) {
+  //     pulseGradientResize(this.__data__.bpm.averages,this.id.slice(6),widthCanvas,heightCanvas);
+  //   } else {
+  //     pulseGradientResize(this.__data__.bpm.averages,this.id.slice(6),316,316);
+  //   }
 
-    $this.toggleClass('big');
+  //   $this.toggleClass('big');
 
-    $container.isotope( 'layout' )
+  //   $container.isotope( 'layout' )
 
-  });
+  // });
 
     // bind sort button click
   $('.sort-by-button-group').on( 'click', 'button', function() {
@@ -280,19 +294,10 @@ function initIsotope() {
     $container.isotope({ filter: '*' })
   });
 
-  $( "#filterNoAvg" ).click(function() {
-    $container.isotope({
-      filter: function() {
-        var number = $(this).find('.idText').text();
-        return number !== 'ID 0';
-      }
-    });
-  });
-
   $( "#filterMin" ).click(function() {
     $container.isotope({
       filter: function() {
-        var number = $(this).find('.minText').text();
+        var number = $(this).find('.avgText').text();
         return parseInt( number, 10 ) < 70;
       }
     });
@@ -311,7 +316,7 @@ function initIsotope() {
   $( "#filterMax" ).click(function() {
     $container.isotope({
       filter: function() {
-        var number = $(this).find('.maxText').text();
+        var number = $(this).find('.avgText').text();
         return parseInt( number, 10 ) > 100;
       }
     });
@@ -377,16 +382,43 @@ function pulseGradient(data,index) {
     .attr('class', 'maxText')
     .text(Math.round(data.max));
 
-  d3.select('#itemID'+index)
-    .append('text')
-    .attr('class', 'idText')
-    .text('ID '+ index.substr(7));
 
-  widthCanvas = $('#itemID'+index).width();
-  heightCanvas = $('#itemID'+index).height();
+  widthCanvas = Math.round(data.avg)+50;
+  heightCanvas = Math.round((data.max - data.min)+50);
+
+  if (widthCanvas > 75) {
+    d3.select('#itemID'+index)
+      .append('text')
+      .attr('class', 'idText')
+      .text('ID '+ index.substr(7));
+  }
+
+  d3.select('#itemID'+index)
+    .transition()
+    .duration(5000)
+    .style('width', widthCanvas+'px');
+
+  d3.select('#itemID'+index)
+    .transition()
+    .duration(5000)
+    .style('height', heightCanvas+'px');
+
+  d3.select('#canvasID'+index)
+    // .transition()
+    // .duration(5000)
+    .attr('width', widthCanvas+'px');
+
+  d3.select('#canvasID'+index)
+    // .transition()
+    // .duration(5000)
+    .attr('height', heightCanvas+'px');
+
+  $('.gridGroup').isotope( 'layout' )
 
   var c=document.getElementById("canvasID"+index);
   var ctx=c.getContext("2d");
+
+  ctx.clearRect(0,0,1000,1000);
 
   var grd=ctx.createLinearGradient(0,0,widthCanvas,0);
 
@@ -399,11 +431,14 @@ function pulseGradient(data,index) {
   }
 
   if (data.avg < minBPM) {
-    grd.addColorStop(.5,'rgb(0,0,0)');
+    grd.addColorStop(.2,'rgb(0,0,0)');
+    grd.addColorStop(.8,'rgb(0,0,0)');
   } else if (data.avg > maxBPM) {
-    grd.addColorStop(.5,'rgb(255,255,255)');
+    grd.addColorStop(.2,'rgb(255,255,255)');
+    grd.addColorStop(.8,'rgb(255,255,255)');
   } else {
-    grd.addColorStop(.5,color(data.avg));
+    grd.addColorStop(.2,color(data.avg));
+    grd.addColorStop(.8,color(data.avg));
   }
 
   if (data.max < minBPM) {
@@ -418,6 +453,58 @@ function pulseGradient(data,index) {
   ctx.fillRect(0,0,widthCanvas,heightCanvas);
 
 }
+
+function colorLegend() {
+
+  var width = 100;
+
+  var c=document.getElementById("legend");
+  var ctx=c.getContext("2d");
+
+  var grd=ctx.createLinearGradient(10,0,width-10,0);
+
+  grd.addColorStop(0,'rgb(0,0,0)');
+
+  for (var i = 10; i >= 0; i--) {
+    var pos = (i)/10;
+    var num = (maxBPM - minBPM) / 10;
+
+    grd.addColorStop(pos,color(i*num+minBPM));
+  }
+
+  grd.addColorStop(1,'rgb(255,255,255)');
+
+  ctx.fillStyle=grd;
+  ctx.fillRect(0,0,width,15);
+
+  var ledgendWidth = window.innerWidth;
+
+  var legendscale = d3.scaleLinear()
+    .range([(ledgendWidth/10)*9,ledgendWidth/10])
+    .domain(color.domain());
+
+  var legendaxis = d3.axisTop()
+    .scale(legendscale)
+    .tickSize(6)
+    .ticks(10);
+
+  var svg = d3.select(".legendContainer")
+    .append("svg")
+    .attr("height", 15 + "px")
+    .attr("width", ledgendWidth + "px")
+    .style("position", "absolute")
+    .style("left", "0px")
+    .style("top", "0px")
+
+  svg
+    .append("g")
+    .attr("class", "axis")
+    .attr("transform", "translate(" + (0) + "," + (20) + ")")
+    .call(legendaxis);
+
+}
+
+colorLegend();
 
 </script>
 

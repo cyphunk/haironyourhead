@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<!-- <script src="http://hoyh.nocompany.co/socket.io/socket.io.js"></script> -->
+<script src="http://hoyh.nocompany.co/socket.io/socket.io.js"></script>
 <script src="/socket.io/socket.io.js"></script>
 <script>
     if (window.location.href.indexOf('file://')>=0)
@@ -327,13 +327,6 @@ function pulseGradient(data,index,id) {
 
   d3.select('#itemID'+id).selectAll('text').remove();
 
-  var minAvg = d3.min(data, function(d) { return d[2]; }) - d3.min(avgData, function(d) { return d[2]; });
-
-  d3.select('#itemID'+id)
-    .append('text')
-    .attr('class', 'minText')
-    .text(minAvg);
-
   var meanAvg = d3.mean(data, function(d) { return d[2]; }) - d3.mean(avgData, function(d) { return d[2]; });
 
   d3.select('#itemID'+id)
@@ -341,17 +334,10 @@ function pulseGradient(data,index,id) {
     .attr('class', 'avgText')
     .text(Math.round(meanAvg));
 
-  var maxAvg = d3.max(data, function(d) { return d[2]; }) - d3.max(avgData, function(d) { return d[2]; });
-
-  d3.select('#itemID'+id)
-    .append('text')
-    .attr('class', 'maxText')
-    .text(Math.round(maxAvg));
-
   d3.select('#itemID'+id)
     .append('text')
     .attr('class', 'idText')
-    .text('ID '+ index);
+    .text('ID '+ id.substr(7));
 
   var c = document.getElementById("canvasID"+id);
 
