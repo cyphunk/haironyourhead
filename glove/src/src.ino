@@ -1,5 +1,6 @@
 //******************************************************************************
-const int firmware_version = 22;   //MAJOR.MINOR more info on: http://semver.org  Version as integer to simplify sending OSC report
+const int firmware_version = 23;   //MAJOR.MINOR more info on: http://semver.org  Version as integer to simplify sending OSC report
+const char* fotaImageURL = "http://192.168.1.40/ota/firmware.bin";    // firmware over the air file URL on web server
 #define SERIAL_SPEED 115200       // 9600 for BLE friend
 #define SERIAL_DEBUG true       //coment to turn the serial debuging off
 #define SERIAL_PLOTTER false     // for isolating Arduino IDE serial ploter
@@ -16,6 +17,8 @@ extern "C"{
 #include "credentials.h"  //ignored by git to keep the network details private, add lines below into the file
 #include "devices.h"
 
+#include <ESP8266HTTPClient.h>
+#include <ESP8266httpUpdate.h>
 #include <WiFiUdp.h>
 #include <ESP8266mDNS.h>
 #include <ArduinoOTA.h>
@@ -155,11 +158,11 @@ if (Wire.endTransmission() == 0) {external_adac_present = 1;}
       break;
   }
   if (device->esp_chip_id == 0) {
-    while(1) { 
+    while(1) {
       if (!Serial) Serial.begin(SERIAL_SPEED);
       Serial.println("Could not obtain a chipId we know. Means we dont know what id/IP address to asign. Fail");
       Serial.printf("This ESP8266 Chip id = 0x%08X\n", chip_id);
-      digitalWrite(BUILD_IN_LED, HIGH); delay(500); digitalWrite(BUILD_IN_LED, LOW); 
+      digitalWrite(BUILD_IN_LED, HIGH); delay(500); digitalWrite(BUILD_IN_LED, LOW);
     }
   }
   //Serial.printf("This Device ID/IP %i\n", device->id);
@@ -480,6 +483,40 @@ void osc_destination_fn(OSCMessage &msg){
   #endif
 }
 
+void fota_fn(OSCMessage &msg){
+  int update = msg.getInt(0);
+  #ifdef SERIAL_DEBUG
+    Serial.print("received OSC FOTA: "); Serial.println(update);
+  #endif
+  if (update == 1){
+    #ifdef SERIAL_DEBUG
+      Serial.print("updateing firmware over the air...");
+    #endif
+
+    #ifdef ONBOARDLED     // 3 short flashes to indicate the update
+      for (int i=0; i<3; i++){
+        digitalWrite(BUILD_IN_LED, led_status);
+        delay(200);
+        digitalWrite(BUILD_IN_LED, !led_status);
+        delay(200);
+      }
+    #endif
+    t_httpUpdate_return ret = ESPhttpUpdate.update( fotaImageURL );
+
+    #ifdef SERIAL_DEBUG
+    switch(ret) {
+        case HTTP_UPDATE_FAILED:
+          Serial.printf("HTTP_UPDATE_FAILD Error (%d): %s", ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
+          break;
+
+        case HTTP_UPDATE_NO_UPDATES:
+          Serial.println("HTTP_UPDATE_NO_UPDATES");
+          break;
+      }
+    #endif
+    }
+}
+
 void serial_plot_fn(OSCMessage &msg){
   int onoff = msg.getInt(0);
   if (onoff != 1) {
@@ -505,6 +542,7 @@ void OSCMsgReceive(){
           msgIN.dispatch("/report", report_interval_fn);
           msgIN.dispatch("/destination", osc_destination_fn);
           msgIN.dispatch("/serialplot", serial_plot_fn);
+          msgIN.dispatch("/fota", fota_fn);     // firmware over the air
         } else {
           error = msgIN.getError();
           #ifdef SERIAL_DEBUG
