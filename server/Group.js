@@ -229,7 +229,7 @@ BPM.prototype = {
         this.debugc('bpm_systolic', 'valid')
         return ms;
     },
-    detect: function(pulse_value) {
+    detect_: function(pulse_value) {
       if (this._waitingforbeatpeak
           && pulse_value >= this.options.systolic_floor_value) {
           this.debug('beat')
@@ -247,7 +247,7 @@ BPM.prototype = {
             this._waitingforbeatpeak = true;
           }
     },
-    detect_: function(pulse_value) {
+    detect: function(pulse_value) {
         this.debugb('detect begin', pulse_value)
         if (this._waitingforbeatpeak) {
             if (pulse_value >= this.options.systolic_floor_value) {
