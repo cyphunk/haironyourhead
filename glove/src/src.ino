@@ -73,13 +73,13 @@ unsigned long currentMillisReport, currentMillisMeasurment, runningTime;
 // Adafruit_ADS1115 ads;  // Use this for the 16-bit version - first prototype made for workshop with GSR and neopixel
 Adafruit_ADS1015 ads;     // Use thi for the 12-bit version -  units 203 and 204
 
-// static uint16_t readRegister(uint8_t i2cAddress, uint8_t reg) {
-//   Wire.beginTransmission(i2cAddress);
-//   Wire.write((uint8_t)ADS1015_REG_POINTER_CONVERT);
-//   Wire.endTransmission();
-//   Wire.requestFrom(i2cAddress, (uint8_t)2);
-//   return ((Wire.read() << 8) | Wire.read());
-// }
+ static uint16_t readRegister(uint8_t i2cAddress, uint8_t reg) {
+   Wire.beginTransmission(i2cAddress);
+   Wire.write((uint8_t)ADS1015_REG_POINTER_CONVERT);
+   Wire.endTransmission();
+   Wire.requestFrom(i2cAddress, (uint8_t)2);
+   return ((Wire.read() << 8) | Wire.read());
+ }
 
 // normalize function variables
 long sliding_min = -1;
@@ -287,11 +287,11 @@ if(external_adac_present){
   ads.begin();
 }
 
-// Serial.print("ADS? ");
-// uint32_t reg = readRegister(ADS1015_ADDRESS, ADS1015_REG_POINTER_CONFIG);
-// #if ARDUINO >= 100
-// Serial.println(reg);
-// #endif
+ Serial.print("ADS? ");
+ uint32_t reg = readRegister(ADS1015_ADDRESS, ADS1015_REG_POINTER_CONFIG);
+ #if ARDUINO >= 100
+ Serial.println(reg);
+ #endif
 
 #ifdef NEOPIXEL
   FastLED.showColor(CHSV(HUE_GREEN, 255, 100));
