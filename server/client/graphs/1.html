@@ -226,7 +226,7 @@ CANVASJS
  -->
 
 
-
+<div id=hr></div>
 <div id="chartContainer" style="height: 300px; width: 100%; display:none"></div>
 
 <script>
@@ -261,6 +261,12 @@ var dataLength = 20; // number of dataPoints visible at any point
 // setInterval(function(){updateChart()}, updateInterval);
 
 var osc_int_offset = null;
+var hr1 = 0, hr2 = 0, h3 = 0;
+var window1 = [0, 0, 0, 0, 0]
+var window2 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+var window3 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+var waiting = 0;
+var hrelem = document.getElementById('hr')
 function device_graph_push_canvasjs(data) {
     document.getElementById('chartContainer').style.display='block'
     document.getElementById('d3div').style.display='none'
@@ -281,7 +287,19 @@ function device_graph_push_canvasjs(data) {
          // y: valueScalehr(data[1])
          y: data[1]
      });
-
+     if (waiting && data[1]>600) {
+       waiting = false
+       window1.shift(); window1.push(now)
+       window2.shift(); window2.push(now)
+       window3.shift(); window3.push(now)
+       hr1 = (60*1000) / ((window1[window1.length-1]-window1[0])/window1.length)
+       hr2 = (60*1000) / ((window2[window2.length-1]-window2[0])/window2.length)
+       hr3 = (60*1000) / ((window3[window3.length-1]-window3[0])/window3.length)
+       hrelem.innerText = parseInt(hr1)+' '+parseInt(hr2)+' '+parseInt(hr3)
+     }
+     else if (!waiting && data[1]<400) {
+       waiting = true;
+     }
 
      chartc.render();
 

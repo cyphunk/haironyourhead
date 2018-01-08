@@ -1,6 +1,5 @@
 //******************************************************************************
 const int firmware_version = 23;   //MAJOR.MINOR more info on: http://semver.org  Version as integer to simplify sending OSC report
-const char* fotaImageURL = "http://192.168.1.40/ota/firmware.bin";    // firmware over the air file URL on web server
 #define SERIAL_SPEED 115200       // 9600 for BLE friend
 #define SERIAL_DEBUG true       //coment to turn the serial debuging off
 #define SERIAL_PLOTTER false     // for isolating Arduino IDE serial ploter
@@ -15,6 +14,15 @@ extern "C"{
 }
 #include <ESP8266WiFi.h>
 #include "credentials.h"  //ignored by git to keep the network details private, add lines below into the file
+/* credentials.h example:
+IPAddress gateway(10, 42, 0, 1);    
+IPAddress subnet(255, 255, 255, 0);    
+const char* fotaImageURL = "http://10.42.0.11/ota/firmware.bin";    // firmware over the air file URL on web server
+const int destPort = 9999;
+const int localPort = 8888;
+const char ssid[] = "wifi";
+const char password[] = "password";
+ */
 #include "devices.h"
 
 #include <ESP8266HTTPClient.h>
