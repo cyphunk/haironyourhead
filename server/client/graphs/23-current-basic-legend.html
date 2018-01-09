@@ -143,7 +143,7 @@ socket.on('connect', function () {
 
     window.setInterval(function() {
         socket.emit('get_samples', null, "latest")
-    }, 1000)
+    }, 500)
 });
 socket.on('averages', function(data){
     console.log('### averages',data)
@@ -169,7 +169,7 @@ socket.on('averages', function(data){
 
 });
 socket.on('samples', function(data){
-    console.log('### samples',data)
+    console.log('### samples')
 
     Object.keys(data).forEach(function(k) {
         if (data[k].bpm.samples.length >= 1) {
