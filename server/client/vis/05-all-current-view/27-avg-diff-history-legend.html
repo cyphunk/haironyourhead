@@ -3,7 +3,7 @@
 <head>
 
 <script src="http://hoyh.nocompany.co/socket.io/socket.io.js"></script>
-<script src="/socket.io/socket.io.js"></script>
+<script src="js/socket.io.js"></script>
 <script>
     if (window.location.href.indexOf('file://')>=0)
         var socket = io.connect('http://hoyh.nocompany.co');
@@ -41,7 +41,7 @@
     top: 10px;
     color: white;
     font-size: 10px;
-    background-color: black; 
+    background-color: black;
     border-left: 2px solid black;
     border-right: 2px solid black;
   }
@@ -74,7 +74,7 @@
     position: relative;
   }
   #legend{
-    
+
     width: 100%;
     height: 15px;
   }
@@ -202,7 +202,7 @@ socket.on('averages', function(data){
     if (gridHeight > 2) {
       gridHeight -= 2;
     }
-    
+
 });
 
 
@@ -228,7 +228,7 @@ function boxVis_file(data) {
     .attr('width', widthCanvas)
     .attr('height', heightCanvas)
     .attr('id', function(d,i) { return 'canvasID' + i })
-    
+
 
 }
 

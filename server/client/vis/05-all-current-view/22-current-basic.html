@@ -3,7 +3,7 @@
 <head>
 
 <script src="http://hoyh.nocompany.co/socket.io/socket.io.js"></script>
-<!-- <script src="/socket.io/socket.io.js"></script> -->
+<!-- <script src="js/socket.io.js"></script> -->
 <script>
     if (window.location.href.indexOf('file://')>=0)
         var socket = io.connect('http://hoyh.nocompany.co');
@@ -36,7 +36,7 @@
     top: 10px;
     color: white;
     font-size: 10px;
-    background-color: black; 
+    background-color: black;
     border-left: 2px solid black;
     border-right: 2px solid black;
   }
@@ -138,7 +138,7 @@ socket.on('averages', function(data){
             pulseGradient(d,k);
         }
     });
-    
+
 });
 
 
@@ -183,7 +183,7 @@ function boxVis_live(data) {
       .attr('class', 'idText')
       .text('ID '+ d.id.substr(7));
   });
-    
+
 
   setTimeout(function() {
     $('.gridGroup').isotope({
