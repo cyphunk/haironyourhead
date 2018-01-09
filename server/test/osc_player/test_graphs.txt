@@ -9,13 +9,12 @@ box display 240 (there was one on in the display box which we didnt notice until
 time log:
 (times written in by hand and may be off by as much as 5 or 10 seconds)
 4:50  all sit down after getting online one by one
-6:03  philip stars running
-7:00  kim starts running
-7:20  both stop running
+6:03  218 philip stars running
+7:00  214 kim starts running
+7:20  214/218 stop running
 7:50  all begin hugging kim
 8:23  all done hugging
-8:30  kim offline
+8:30  214 kim offline
 9:47  all start running
 11:20 all stop
 14:40 end recording
-
