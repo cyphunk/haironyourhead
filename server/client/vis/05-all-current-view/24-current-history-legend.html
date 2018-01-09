@@ -3,25 +3,13 @@
 <head>
 
 
+<script src="js/socket.io.js"></script>
 <script>
-// loading script this way might work, OR we might have to move all
-// code that reverences into socket to only start after the script.onload() event
-var socket;
-var script = document.createElement('script');
-script.onload = function () {
-  if (window.location.href.indexOf('file://')>=0)
-      socket = io.connect('http://hoyh.nocompany.co');
-  else
-      socket = io.connect('');
-};
-
-if (window.location.href.indexOf('file://')>=0)
-  script.src = 'http://hoyh.nocompany.co/socket.io/socket.io.js';
-else
-  script.src = '/socket.io/socket.io.js';
-
-document.head.appendChild(script);
-
+    if (window.location.href.indexOf('file://')>=0)
+        var socket = io.connect('http://hoyh.nocompany.co');
+    else
+        var socket = io.connect('');
+</script>
 </script>
 
 <style type="text/css">
