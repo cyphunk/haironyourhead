@@ -2,13 +2,26 @@
 <html>
 <head>
 
-<script src="http://hoyh.nocompany.co/socket.io/socket.io.js"></script>
-<!-- <script src="/socket.io/socket.io.js"></script> -->
+
 <script>
-    if (window.location.href.indexOf('file://')>=0)
-        var socket = io.connect('http://hoyh.nocompany.co');
-    else
-        var socket = io.connect('');
+// loading script this way might work, OR we might have to move all
+// code that reverences into socket to only start after the script.onload() event
+var socket;
+var script = document.createElement('script');
+script.onload = function () {
+  if (window.location.href.indexOf('file://')>=0)
+      socket = io.connect('http://hoyh.nocompany.co');
+  else
+      socket = io.connect('');
+};
+
+if (window.location.href.indexOf('file://')>=0)
+  script.src = 'http://hoyh.nocompany.co/socket.io/socket.io.js';
+else
+  script.src = '/socket.io/socket.io.js';
+
+document.head.appendChild(script);
+
 </script>
 
 <style type="text/css">
@@ -41,7 +54,7 @@
     top: 10px;
     color: white;
     font-size: 10px;
-    background-color: black; 
+    background-color: black;
     border-left: 2px solid black;
     border-right: 2px solid black;
   }
@@ -75,7 +88,7 @@
     position: relative;
   }
   #legend{
-    
+
     width: 100%;
     height: 15px;
   }
@@ -178,7 +191,7 @@ socket.on('averages', function(data){
     if (gridHeight > 2) {
       gridHeight -= 2;
     }
-    
+
 });
 
 
@@ -223,7 +236,7 @@ function boxVis_live(data) {
       .attr('class', 'idText')
       .text('ID '+ d.id.substr(7));
   });
-    
+
 
   setTimeout(function() {
     $('.gridGroup').isotope({
