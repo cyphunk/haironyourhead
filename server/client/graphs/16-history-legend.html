@@ -169,14 +169,21 @@ function loadData() {
 
 // loadData();
 
+
+
+// var data_type = 'averages'
+// var data_index = 2
+var data_type = 'samples'
+var data_index = 1
+
 socket.on('connect', function () {
     console.log('### connected')
 
     // get all averages sample for all devices currently online
-    socket.emit('get_averages', null, null)
+    socket.emit('get_'+data_type, null, null)
 });
-socket.on('averages', function(data){
-    console.log('### averages',data)
+socket.on(data_type, function(data){
+    console.log('### '+data_type,data)
 
     boxVis(Object.values(data));
 
@@ -189,8 +196,8 @@ var gridGroup = d3.select(".gridGroup");
 
 function boxVis(data) {
 
-  minTime = d3.min(data, function(d) { return d.bpm.averages[0][0]; });
-  maxTime = d3.max(data, function(d) { return d.bpm.averages[d.bpm.averages.length-1][0]; });
+  minTime = d3.min(data, function(d) { return d.bpm[data_type][0][0]; });
+  maxTime = d3.max(data, function(d) { return d.bpm[data_type][d.bpm[data_type].length-1][0]; });
 
   d3.select('.gridGroup')
     .append('text')
@@ -219,8 +226,8 @@ function boxVis(data) {
     .attr('height', heightCanvas);
 
   Object.keys(data).forEach(function(k) {
-      if (data[k].bpm.averages.length >= 1) {
-          pulseGradient(data[k].bpm.averages,k,data[k].id);
+      if (data[k].bpm[data_type].length >= 1) {
+          pulseGradient(data[k].bpm[data_type],k,data[k].id);
       }
   });
 
@@ -248,9 +255,9 @@ function initIsotope_live() {
     var $this = $(this);
 
     if ($this.hasClass('big')) {
-      pulseGradientResize(this.__data__.bpm.averages,this.id.slice(6),widthCanvas,30);
+      pulseGradientResize(this.__data__.bpm[data_type],this.id.slice(6),widthCanvas,30);
     } else {
-      pulseGradientResize(this.__data__.bpm.averages,this.id.slice(6),documentWidth,400);
+      pulseGradientResize(this.__data__.bpm[data_type],this.id.slice(6),documentWidth,400);
     }
 
     $this.toggleClass('big');
@@ -332,12 +339,12 @@ function pulseGradientResize(data,index,width,height) {
   grd.addColorStop(timeScale(data[0][0]),'rgb(0,0,0)');
 
   data.forEach(function(d,i) {
-    if (+d[2] < minBPM) {
+    if (+d[data_index] < minBPM) {
       grd.addColorStop(timeScale(+d[0]),'rgb(0,0,0)');
-    } else if (+d[2] > maxBPM) {
+    } else if (+d[data_index] > maxBPM) {
       grd.addColorStop(timeScale(+d[0]),'rgb(255,255,255)');
     } else {
-      grd.addColorStop(timeScale(+d[0]),color(+d[2]));
+      grd.addColorStop(timeScale(+d[0]),color(+d[data_index]));
     }
   })
 
@@ -350,7 +357,7 @@ function pulseGradient(data,index,id) {
 
   d3.select('#itemID'+id).selectAll('text').remove();
 
-  var meanAvg = d3.mean(data, function(d) { return d[2]; });
+  var meanAvg = d3.mean(data, function(d) { return d[data_index]; });
 
   d3.select('#itemID'+id)
     .append('text')
@@ -372,12 +379,12 @@ function pulseGradient(data,index,id) {
   grd.addColorStop(timeScale(data[0][0]),'rgb(0,0,0)');
 
   data.forEach(function(d,i) {
-    if (+d[2] < minBPM) {
+    if (+d[data_index] < minBPM) {
       grd.addColorStop(timeScale(+d[0]),'rgb(0,0,0)');
-    } else if (+d[2] > maxBPM) {
+    } else if (+d[data_index] > maxBPM) {
       grd.addColorStop(timeScale(+d[0]),'rgb(255,255,255)');
     } else {
-      grd.addColorStop(timeScale(+d[0]),color(+d[2]));
+      grd.addColorStop(timeScale(+d[0]),color(+d[data_index]));
     }
   })
 
