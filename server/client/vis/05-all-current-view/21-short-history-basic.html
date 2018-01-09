@@ -3,7 +3,7 @@
 <head>
 
 
-<!-- <script src="js/socket.io.js"></script> -->
+<script src="js/socket.io.js"></script>
 <script>
     if (window.location.href.indexOf('file://')>=0)
         var socket = io.connect('http://hoyh.nocompany.co');
@@ -36,7 +36,7 @@
     top: 10px;
     color: white;
     font-size: 10px;
-    background-color: black; 
+    background-color: black;
     border-left: 2px solid black;
     border-right: 2px solid black;
   }
@@ -168,7 +168,7 @@ socket.on('averages', function(data){
     }
 
 
-    
+
 });
 
 
@@ -194,7 +194,7 @@ function boxVis_file(data) {
     .attr('width', widthCanvas)
     .attr('height', heightCanvas)
     .attr('id', function(d,i) { return 'canvasID' + i })
-    
+
 
 }
 
@@ -391,7 +391,7 @@ function pulseGradient(data,index) {
     }
 
   // var grd=ctx.createLinearGradient(0,0,widthCanvas,0);
-  
+
   // if (data.min < minBPM) {
   //   grd.addColorStop(0,'rgb(0,0,0)');
   // } else if (data.min > maxBPM) {
