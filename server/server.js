@@ -189,8 +189,6 @@ io.sockets.on('connection', function(socket) {
         console.log('socket.io<get_samples',device_id,start_time,end_time);
 
         var ret =  slice_samples('samples', device_id,start_time,end_time);
-        util = require('util')
-        console.log('ret', util.inspect(ret, null, 2))
         socket.emit('samples',  ret);
     });
 
@@ -198,7 +196,6 @@ io.sockets.on('connection', function(socket) {
     socket.on('get_averages', function(device_id,start_time,end_time) {
         console.log('socket.io<get_averages',device_id,start_time,end_time);
         var ret =  slice_samples('averages', device_id,start_time,end_time);
-        console.log('ret', ret)
         socket.emit('averages',  ret);
     });
 
@@ -376,13 +373,18 @@ function packets_per_second(packets_total) {
                res.send(`Test streams already running: ${stdout}<br><br><a href="/runtestend">stop streams</a><br><br><a href="/runtestcleardata">reset show data</a>`);
            }
            else {
-               res.send(`Test streams already running: 0<br><br><a href="/runtestbegin">start streams</a> for 20 minutes<br><br><a href="/runtestcleardata">reset show data</a>`);
+               res.send(`Test streams already running: 0<br><br><a href="/runtestbegin">start streams</a> for 20 minutes<br><a href="/runtestbegin41">start 41 streams</a> for 20 minutes<br><br><a href="/runtestcleardata">reset show data</a>`);
            }
          });
 
      });
      app.use('/runtestbegin', (req, res) => {
        exec('cd ./test/osc_player/ && timeout 20m ./run.sh >/dev/null &', (err, stdout, stderr) => {});
+       // exec('cd ./test/osc_player/ && timeout 20m ./run4.sh >/dev/null &', (err, stdout, stderr) => {});
+         res.redirect('back');
+     });
+     app.use('/runtestbegin41', (req, res) => {
+       exec('cd ./test/osc_player/ && timeout 20m ./run41.sh >/dev/null &', (err, stdout, stderr) => {});
        // exec('cd ./test/osc_player/ && timeout 20m ./run4.sh >/dev/null &', (err, stdout, stderr) => {});
          res.redirect('back');
      });
