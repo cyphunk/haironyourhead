@@ -204,7 +204,7 @@ io.sockets.on('connection', function(socket) {
 
     socket.on('osc_send', function(data) {
         console.log('socket.io<osc_send', data);
-        var client = new osc.Client( ip_prefix+data.device_id, 8888);
+        var client = new osc.Client( ip_prefix+data.device_id.replace('device_',''), 8888);
         client.send(data.path, data.value);
     });
 

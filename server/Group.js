@@ -446,7 +446,8 @@ Group.prototype = {
         return {
             total_beats_count: this.total_beats_count,
             total_beats_sum:   this.total_beats_sum,
-            total_bpm_avg:     this.total_beats_sum/this.total_beats_count
+            total_bpm_avg:     this.total_beats_sum/this.total_beats_count,
+            device_ids: Object.keys(this.devices)
         }
     },
     get_bpm_last: function (device_id) {
