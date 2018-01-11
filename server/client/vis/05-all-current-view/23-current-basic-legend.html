@@ -94,7 +94,7 @@
 
 <div class="button-group sort-by-button-group js-radio-button-group">
   Sort by:
-    <button class="button" data-sort-value="">ID</button>
+    <button class="button" data-sort-value="idText">ID</button>
     <button class="button" data-sort-value="avgText">Avg. Pulse</button>
 </div>
 
@@ -200,6 +200,8 @@ function boxVis_live(data) {
       })
     });
 
+  d3.selectAll('.idText').remove();
+
   data.forEach(function(d) {
     d3.select('#itemID'+d.id)
       .append('text')
@@ -229,9 +231,9 @@ function initIsotope() {
     itemSelector: '.gridItem',
     layoutMode: 'packery',
     getSortData: {
-      minText: '.minText parseInt',
+      // minText: '.minText parseInt',
       avgText: '.avgText parseInt',
-      maxText: '.maxText parseInt'
+      idText: '.idText'
     }
   });
 
@@ -255,6 +257,7 @@ function initIsotope() {
   $('.sort-by-button-group').on( 'click', 'button', function() {
     $('.gridGroup').isotope('updateSortData', $('.gridItem'))
     var sortValue = $(this).attr('data-sort-value');
+    console.log(sortValue) // .substr(7)
     $container.isotope({ sortBy: sortValue });
   });
 

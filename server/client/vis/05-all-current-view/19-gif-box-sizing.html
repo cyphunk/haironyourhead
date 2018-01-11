@@ -79,7 +79,7 @@
 
 <div class="button-group sort-by-button-group js-radio-button-group">
   Sort by:
-    <button class="button" data-sort-value="">ID</button>
+    <button class="button" data-sort-value="idText">ID</button>
     <!-- <button class="button" data-sort-value="minText">Min. Pulse</button> -->
     <button class="button" data-sort-value="avgText">Avg. Pulse</button>
     <!-- <button class="button" data-sort-value="maxText">Max. Pulse</button> -->
@@ -234,9 +234,8 @@ function initIsotope() {
     // stagger: 30,
     transitionDuration: '3.0s',
     getSortData: {
-      minText: '.minText parseInt',
       avgText: '.avgText parseInt',
-      maxText: '.maxText parseInt'
+      idText: '.idText'
     }
   });
 

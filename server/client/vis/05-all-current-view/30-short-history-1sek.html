@@ -97,7 +97,7 @@
 
 <div class="button-group sort-by-button-group js-radio-button-group">
   Sort by:
-    <button class="button" data-sort-value="">ID</button>
+    <button class="button" data-sort-value="idText">ID</button>
     <button class="button" data-sort-value="avgText">Avg. Pulse</button>
 </div>
 
@@ -230,23 +230,25 @@ function boxVis_live(data) {
       })
     });
 
+  d3.selectAll('.itemText').remove();
+
   data.forEach(function(d) {
     d3.select('#itemID'+d.id)
       .append('text')
-      .attr('class', 'idText')
+      .attr('class', 'itemText idText')
       .text('ID '+ d.id.substr(7));
 
     d3.select('#itemID'+d.id)
       .append('text')
-      .attr('class', 'avgText')
+      .attr('class', 'itemText avgText')
 
     d3.select('#itemID'+d.id)
       .append('text')
-      .attr('class', 'minText')
+      .attr('class', 'itemText minText')
 
     d3.select('#itemID'+d.id)
       .append('text')
-      .attr('class', 'maxText')
+      .attr('class', 'itemText maxText')
   });
 
 
@@ -271,9 +273,8 @@ function initIsotope() {
     itemSelector: '.gridItem',
     layoutMode: 'packery',
     getSortData: {
-      minText: '.minText parseInt',
       avgText: '.avgText parseInt',
-      maxText: '.maxText parseInt'
+      idText: '.idText'
     }
   });
 
