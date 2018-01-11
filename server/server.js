@@ -33,7 +33,7 @@ var serveIndex = require('serve-index')
 var os         = require('os');
 var program    = require('commander');
 
-require('./processor-usage.js').startWatching()
+// require('./processor-usage.js').startWatching()
 // updates global processCpuUsage by checking proc
 
 program
@@ -293,7 +293,7 @@ function processOsc(message) {
         console.log("show average bpm:",
                     show.total_beats_sum/show.total_beats_count);
         console.log('osc packets_per_second:', packets_per_second(osc_pkts))
-        console.log('processor CPU:', global.processCpuUsage*100)
+        // console.log('processor CPU:', global.processCpuUsage*100)
     }
 
 
