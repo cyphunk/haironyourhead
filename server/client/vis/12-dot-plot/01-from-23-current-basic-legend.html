@@ -36,7 +36,7 @@
     top: 10px;
     color: white;
     font-size: 10px;
-    background-color: black; 
+    background-color: black;
     border-left: 2px solid black;
     border-right: 2px solid black;
   }
@@ -70,7 +70,7 @@
     position: relative;
   }
   #legend{
-    
+
     width: 100%;
     height: 15px;
   }
@@ -162,7 +162,7 @@ socket.on('averages', function(data){
             pulseGradient(d,k);
         }
     });
-    
+
 });
 
 
@@ -207,7 +207,7 @@ function boxVis_live(data) {
       .attr('class', 'idText')
       .text('ID '+ d.id.substr(7));
   });
-    
+
 
   setTimeout(function() {
     $('.gridGroup').isotope({

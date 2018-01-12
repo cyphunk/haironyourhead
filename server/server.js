@@ -24,14 +24,14 @@
     python3 osc_record_replay.py ./nathan.csv 9999 replay localhost
 
  */
-var Timer      = require('./Timer.js') // simple timer to do something when N time has passed
-var Group      = require('./Group.js') // BPM, Device information storage a BPM detection
-var osc        = require('node-osc'); // used to send OSC messages from web admin to devices
+var Timer       = require('./Timer.js') // simple timer to do something when N time has passed
+var Group       = require('./Group.js') // BPM, Device information storage a BPM detection
+var osc         = require('node-osc'); // used to send OSC messages from web admin to devices
 var OSCListener = require('./OSCListener.js'); // creates our OSC server to listen for pulses
-var serveIndex = require('serve-index')
+var serveIndex  = require('serve-index')
 
-var os         = require('os');
-var program    = require('commander');
+var os          = require('os');
+var program     = require('commander');
 
 // require('./processor-usage.js').startWatching()
 // updates global processCpuUsage by checking proc
@@ -76,6 +76,11 @@ var debugb = require('debug')('averages')
 
 var show = new Group(showname)
 show.on_beat_cb = on_beat_cb
+setInterval(function(){
+  var json = JSON.stringify(show,null,4);
+    fs.writeFile(show.name+'_autosave.json', json, 'utf8',
+        function(){console.log('saved',show.name+'.json')});
+},60000)
 
 var express  = require('express')
 var app      = express();
@@ -189,7 +194,7 @@ io.sockets.on('connection', function(socket) {
 
     }
     socket.on('get_samples', function(device_id,start_time,end_time) {
-        console.log('socket.io<get_samples',device_id,start_time,end_time);
+        debuga('socket.io<get_samples',device_id,start_time,end_time);
 
         var ret =  slice_samples('samples', device_id,start_time,end_time);
         socket.emit('samples',  ret);
@@ -197,15 +202,18 @@ io.sockets.on('connection', function(socket) {
 
 
     socket.on('get_averages', function(device_id,start_time,end_time) {
-        console.log('socket.io<get_averages',device_id,start_time,end_time);
+        debuga('socket.io<get_averages',device_id,start_time,end_time);
         var ret =  slice_samples('averages', device_id,start_time,end_time);
         socket.emit('averages',  ret);
     });
 
     socket.on('osc_send', function(data) {
         console.log('socket.io<osc_send', data);
+        try {
         var client = new osc.Client( ip_prefix+data.device_id.replace('device_',''), 8888);
         client.send(data.path, data.value);
+        } catch(e){console.log(e)}
+
     });
 
 
