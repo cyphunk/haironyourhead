@@ -255,7 +255,7 @@ app.use('/vis', express.static('client/vis'), serveIndex('client/vis', {'icons':
 
 var oscserver = new OSCListener.Server(oscport);
 
-oscserver.on_message_cb = processOsc;
+oscserver.on_message_cb = processOsc; 
 oscserver.start();
 
 // call back on beat detection
