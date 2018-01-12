@@ -35,6 +35,15 @@
     width: 316px;
     height: 316px;
   }
+  canvas{
+    width: 100px;
+    height: 100px;
+  }
+
+  .big canvas{
+    width: 316px;
+    height: 316px;
+  }
 
   .idText{
     position: absolute;
@@ -120,10 +129,9 @@
 <div class="button-group filter-by-button-group js-radio-button-group">
   Filter by:
     <button id="filterNon" class="button" >Show all</button>
-    <button id="filterNoAvg" class="button" >No Average</button>
-    <button id="filterMin" class="button" >Pulse < 70</button>
-    <button id="filterAvg" class="button" >Pulse 70 - 90</button>
-    <button id="filterMax" class="button" >Pulse > 100</button>
+    <button id="filterMin" class="button" >+/- 10 from AVG</button>
+    <button id="filterAvg" class="button" >+/- 20 from AVG</button>
+    <button id="filterMax" class="button" >Outliers (20 +/-)</button>
 </div>
 
 <br>
@@ -134,17 +142,21 @@
 
 <br>
 
+
 <div class="gridGroup"></div>
+
 
 <script>
 
 var widthCanvas = 100;
 var heightCanvas = 100;
 
-var minBPM = 40;
-var maxBPM = 140;
+var minBPM = -50;
+var maxBPM = +50;
 
 var color = d3.scaleSequential(d3.interpolateRainbow).domain([maxBPM , minBPM]);
+
+var avgMIN, avgAVG, avgMAX;
 
 var itemsNum = 0;
 
@@ -169,7 +181,14 @@ socket.on('connect', function () {
 });
 socket.on('averages', function(data){
     // console.log('### averages',data)
+
     if (updates == 'on') {
+
+        avgMIN = data.device_0.bpm.averages[0][1];
+        avgAVG = data.device_0.bpm.averages[0][2];
+        avgMAX = data.device_0.bpm.averages[0][3];
+
+
         if (itemsNum != Object.values(data).length) {
           itemsNum = Object.values(data).length;
 
@@ -188,11 +207,14 @@ socket.on('averages', function(data){
                 pulseGradient(d,k);
             }
         });
-    }
-
+    }   
 });
 socket.on('samples', function(data){
     // console.log('### samples')
+
+    // avgMIN = data.device_0.bpm.averages[0][1];
+    avgAVG = data.device_0.bpm.samples[0][1];
+    // avgMAX = data.device_0.bpm.averages[0][3];
 
     if (updates == 'on') {
       Object.keys(data).forEach(function(k) {
@@ -202,9 +224,7 @@ socket.on('samples', function(data){
               pulseGradient_text(bpm,k);
           }
       });
-    }
-
-    
+    } 
 
 });
 
@@ -265,16 +285,6 @@ function boxVis_live(data) {
       .attr('class', 'itemText maxText')
   });
 
-
-  setTimeout(function() {
-    $('.gridGroup').isotope({
-      filter: function() {
-        var number = $(this).find('.idText').text();
-        return number !== 'ID 0';
-      }
-    });
-  }, 50);
-
 }
 
 
@@ -296,11 +306,11 @@ function initIsotope() {
 
     var $this = $(this);
 
-    if ($this.hasClass('big')) {
-      pulseGradientResize(this.__data__.bpm.averages,this.id.slice(6),widthCanvas,heightCanvas);
-    } else {
-      pulseGradientResize(this.__data__.bpm.averages,this.id.slice(6),316,316);
-    }
+    // if ($this.hasClass('big')) {
+    //   // pulseGradientResize(this.__data__.bpm.averages,this.id.slice(6),widthCanvas,heightCanvas);
+    // } else {
+    //   // pulseGradientResize(this.__data__.bpm.averages,this.id.slice(6),316,316);
+    // }
 
     $this.toggleClass('big');
 
@@ -328,30 +338,20 @@ function initIsotope() {
     $container.isotope({ filter: '*' })
   });
 
-  $( "#filterNoAvg" ).click(function() {
-    $container.isotope({
-      filter: function() {
-        var number = $(this).find('.idText').text();
-        return number !== 'ID 0';
-      }
-    });
-  });
-
   $( "#filterMin" ).click(function() {
     $container.isotope({
       filter: function() {
         var number = $(this).find('.avgText').text();
-        return parseInt( number, 10 ) < 70;
+        return parseInt( number, 10 ) < 10 && parseInt( number, 10 ) > -10;
       }
     });
   });
-
 
   $( "#filterAvg" ).click(function() {
     $container.isotope({
       filter: function() {
         var number = $(this).find('.avgText').text();
-        return parseInt( number, 10 ) > 70 && parseInt( number, 10 ) < 90;
+        return parseInt( number, 10 ) < 20 && parseInt( number, 10 ) > -20;
       }
     });
   });
@@ -360,7 +360,7 @@ function initIsotope() {
     $container.isotope({
       filter: function() {
         var number = $(this).find('.avgText').text();
-        return parseInt( number, 10 ) > 100;
+        return parseInt( number, 10 ) > 20 || parseInt( number, 10 ) < -20;
       }
     });
   });
@@ -369,56 +369,55 @@ function initIsotope() {
 
 function pulseGradientResize(data,index,width,height) {
 
-  document.getElementById('canvasID'+index).width = width;
-  document.getElementById('canvasID'+index).height = height;
+  // data.min =  data[0][1] - avgMIN;
+  // data.avg =  data[0][2] - avgAVG;
+  // data.max =  data[0][3] - avgMAX;
 
-  var c = document.getElementById("canvasID"+index);
-  var ctx = c.getContext("2d");
+  // document.getElementById('canvasID'+index).width = width;
+  // document.getElementById('canvasID'+index).height = height;
 
-  var grd = ctx.createLinearGradient(0,0,width,0);
+  // var c = document.getElementById("canvasID"+index);
+  // var ctx = c.getContext("2d");
 
-  if (data[0][1] < minBPM) {
-    grd.addColorStop(0,'rgb(0,0,0)');
-  } else if (data[0][1] > maxBPM) {
-    grd.addColorStop(0,'rgb(255,255,255)');
-  } else {
-    grd.addColorStop(0,color(data[0][1]));
-  }
+  // var grd = ctx.createLinearGradient(0,0,width,0);
 
-  if (data[0][2] < minBPM) {
-    grd.addColorStop(.2,'rgb(0,0,0)');
-    grd.addColorStop(.8,'rgb(0,0,0)');
-  } else if (data[0][2] > maxBPM) {
-    grd.addColorStop(.2,'rgb(255,255,255)');
-    grd.addColorStop(.8,'rgb(255,255,255)');
-  } else {
-    grd.addColorStop(.2,color(data[0][2]));
-    grd.addColorStop(.8,color(data[0][2]));
-  }
+  // if (data.min < minBPM) {
+  //   grd.addColorStop(0,'rgb(0,0,0)');
+  // } else if (data.min > maxBPM) {
+  //   grd.addColorStop(0,'rgb(255,255,255)');
+  // } else {
+  //   grd.addColorStop(0,color(data.min));
+  // }
 
-  if (data[0][3] < minBPM) {
-    grd.addColorStop(1,'rgb(0,0,0)');
-  } else if (data[0][3] > maxBPM) {
-    grd.addColorStop(1,'rgb(255,255,255)');
-  } else {
-    grd.addColorStop(1,color(data[0][3]));
-  }
+  // if (data.avg < minBPM) {
+  //   grd.addColorStop(.2,'rgb(0,0,0)');
+  //   grd.addColorStop(.8,'rgb(0,0,0)');
+  // } else if (data.avg > maxBPM) {
+  //   grd.addColorStop(.2,'rgb(255,255,255)');
+  //   grd.addColorStop(.8,'rgb(255,255,255)');
+  // } else {
+  //   grd.addColorStop(.2,color(data.avg));
+  //   grd.addColorStop(.8,color(data.avg));
+  // }
 
-  ctx.fillStyle=grd;
-  ctx.fillRect(0,0,width,height);
+  // if (data.max < minBPM) {
+  //   grd.addColorStop(1,'rgb(0,0,0)');
+  // } else if (data.max > maxBPM) {
+  //   grd.addColorStop(1,'rgb(255,255,255)');
+  // } else {
+  //   grd.addColorStop(1,color(data.max));
+  // }
+
+  // ctx.fillStyle=grd;
+  // ctx.fillRect(0,0,width,height);
 
 }
 
 function pulseGradient_text(bpm,index) {
   // d3.select('#itemID'+index).selectAll('.avgText').remove();
 
-  d3.select('#itemID'+index).select('.avgText')
-    .text(Math.round(bpm));
-
   var minText = d3.select('#itemID'+index).select('.minText').text();
   var maxText = d3.select('#itemID'+index).select('.maxText').text();
-
-  // console.log(minText)
 
   pulseGradient1Sek(minText,maxText,bpm,index)
 
@@ -426,13 +425,20 @@ function pulseGradient_text(bpm,index) {
 
 function pulseGradient1Sek(min,max,avg,index) {
 
-  widthCanvas = document.getElementById('canvasID'+index).width;
-  heightCanvas = document.getElementById('canvasID'+index).height;
+  avg =  avg - avgAVG;
+
+  d3.select('#itemID'+index).select('.avgText')
+    .text(Math.round(avg));
+
+  widthCanvas = $('#itemID'+index).width();
+  heightCanvas = $('#itemID'+index).height();
 
   var c=document.getElementById("canvasID"+index);
   var ctx=c.getContext("2d");
 
   var grd=ctx.createLinearGradient(0,0,widthCanvas,0);
+
+  // avgMIN, avgAVG, avgMAX;
 
   if (min < minBPM) {
     grd.addColorStop(0,'rgb(0,0,0)');
@@ -468,46 +474,15 @@ function pulseGradient1Sek(min,max,avg,index) {
 
 function pulseGradient(data,index) {
 
+  data.min =  data.min - avgMIN;
+  data.avg =  data.avg - avgAVG;
+  data.max =  data.max - avgMAX;
+
   d3.select('#itemID'+index).select('.minText')
     .text(Math.round(data.min));
 
   d3.select('#itemID'+index).select('.maxText')
     .text(Math.round(data.max));
-
-  var c=document.getElementById("canvasID"+index);
-  var ctx=c.getContext("2d");
-
-  var grd=ctx.createLinearGradient(0,0,widthCanvas,0);
-
-  if (data.min < minBPM) {
-    grd.addColorStop(0,'rgb(0,0,0)');
-  } else if (data.min > maxBPM) {
-    grd.addColorStop(0,'rgb(255,255,255)');
-  } else {
-    grd.addColorStop(0,color(data.min));
-  }
-
-  if (data.avg < minBPM) {
-    grd.addColorStop(.2,'rgb(0,0,0)');
-    grd.addColorStop(.8,'rgb(0,0,0)');
-  } else if (data.avg > maxBPM) {
-    grd.addColorStop(.2,'rgb(255,255,255)');
-    grd.addColorStop(.8,'rgb(255,255,255)');
-  } else {
-    grd.addColorStop(.2,color(data.avg));
-    grd.addColorStop(.8,color(data.avg));
-  }
-
-  if (data.max < minBPM) {
-    grd.addColorStop(1,'rgb(0,0,0)');
-  } else if (data.max > maxBPM) {
-    grd.addColorStop(1,'rgb(255,255,255)');
-  } else {
-    grd.addColorStop(1,color(data.max));
-  }
-
-  ctx.fillStyle=grd;
-  ctx.fillRect(0,0,widthCanvas,heightCanvas);
 
 }
 
