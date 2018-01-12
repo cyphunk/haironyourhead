@@ -19,15 +19,16 @@
     font-family: 'helvetica';
   }
 
+  .updateButton{
+    position: absolute;
+    right: 10px;
+    top: 10px;
+  }
+
   .gridItem{
     padding: 4px;
     width: 100px;
     height: 100px;
-  }
-
-  .gridItem canvas{
-    width: 100%;
-    height: 100%;
   }
 
   .gridItem.big {
@@ -41,7 +42,7 @@
     top: 10px;
     color: white;
     font-size: 10px;
-    background-color: black; 
+    background-color: black;
     border-left: 2px solid black;
     border-right: 2px solid black;
   }
@@ -51,6 +52,7 @@
     left: 10px;
     bottom: 10px;
     color: black;
+    font-size: 0;
   }
   .avgText{
     position: absolute;
@@ -64,6 +66,7 @@
     right: 10px;
     bottom: 10px;
     color: black;
+    font-size: 0;
   }
   #itemIDdevice_0{
     border: 1px solid white;
@@ -75,7 +78,7 @@
     position: relative;
   }
   #legend{
-    
+
     width: 100%;
     height: 15px;
   }
@@ -100,8 +103,16 @@
 
 <div class="button-group sort-by-button-group js-radio-button-group">
   Sort by:
-    <button class="button" data-sort-value="">ID</button>
+    <button class="button" data-sort-value="idText">ID</button>
     <button class="button" data-sort-value="avgText">Avg. Pulse</button>
+</div>
+
+<div class="updateButton">
+    <form action="">
+      Updates:
+      <input type="radio" name="updateSelect" value="on" checked> on
+      <input type="radio" name="updateSelect" value="off"> off
+    </form>
 </div>
 
 <br>
@@ -127,8 +138,8 @@
 
 <script>
 
-var widthCanvas = 10000;
-var heightCanvas = 10000;
+var widthCanvas = 100;
+var heightCanvas = 100;
 
 var minBPM = 40;
 var maxBPM = 140;
@@ -136,8 +147,8 @@ var maxBPM = 140;
 var color = d3.scaleSequential(d3.interpolateRainbow).domain([maxBPM , minBPM]);
 
 var itemsNum = 0;
-var gridSlice = 0;
-var gridHeight = heightCanvas;
+
+var updates = $( 'input[name=updateSelect]:checked' ).val();
 
 socket.on('connect', function () {
     console.log('### connected')
@@ -147,40 +158,52 @@ socket.on('connect', function () {
     window.setInterval(function() {
         socket.emit('get_averages', null, "latest")
     }, 5000)
+
+    window.setInterval(function() {
+        socket.emit('get_samples', null, "latest")
+    }, 500)
 });
 socket.on('averages', function(data){
-    console.log('### averages',data)
+    // console.log('### averages',data)
+    if (updates == 'on') {
+        if (itemsNum != Object.values(data).length) {
+          itemsNum = Object.values(data).length;
 
+          boxVis_live(Object.values(data));
 
-    if (itemsNum != Object.values(data).length) {
-      itemsNum = Object.values(data).length;
-
-      boxVis_live(Object.values(data));
-
-    }
-
-    Object.keys(data).forEach(function(k) {
-        if (data[k].bpm.averages.length >= 1) {
-            var entry = data[k].bpm.averages[0]
-            var d = {
-                min: entry[1],
-                avg: entry[2],
-                max: entry[3]
-            }
-            pulseGradient(d,k);
         }
-    });
 
-    if (gridSlice < 10000) {
-      gridSlice += 100;
-    } else {
-      gridSlice = 0;
-      gridHeight = 100;
+        Object.keys(data).forEach(function(k) {
+            if (data[k].bpm.averages.length >= 1) {
+                var entry = data[k].bpm.averages[0]
+                var d = {
+                    min: entry[1],
+                    avg: entry[2],
+                    max: entry[3]
+                }
+                pulseGradient(d,k);
+            }
+        });
     }
-    // if (gridHeight > 2) {
-    //   gridHeight -= 2;
-    // }
+
+});
+socket.on('samples', function(data){
+    // console.log('### samples')
+
+    updates = $( 'input[name=updateSelect]:checked' ).val();
+
+    if (updates == 'on') {
+      Object.keys(data).forEach(function(k) {
+          if (data[k].bpm.samples.length >= 1) {
+              var entry = data[k].bpm.samples[0]
+              var bpm = entry[1]
+              pulseGradient_text(bpm,k);
+          }
+      });
+    }
+
     
+
 });
 
 
@@ -219,13 +242,27 @@ function boxVis_live(data) {
       })
     });
 
+  d3.selectAll('.itemText').remove();
+
   data.forEach(function(d) {
     d3.select('#itemID'+d.id)
       .append('text')
-      .attr('class', 'idText')
+      .attr('class', 'itemText idText')
       .text('ID '+ d.id.substr(7));
+
+    d3.select('#itemID'+d.id)
+      .append('text')
+      .attr('class', 'itemText avgText')
+
+    d3.select('#itemID'+d.id)
+      .append('text')
+      .attr('class', 'itemText minText')
+
+    d3.select('#itemID'+d.id)
+      .append('text')
+      .attr('class', 'itemText maxText')
   });
-    
+
 
   setTimeout(function() {
     $('.gridGroup').isotope({
@@ -248,15 +285,20 @@ function initIsotope() {
     itemSelector: '.gridItem',
     layoutMode: 'packery',
     getSortData: {
-      minText: '.minText parseInt',
       avgText: '.avgText parseInt',
-      maxText: '.maxText parseInt'
+      idText: '.idText'
     }
   });
 
   $(document).on('click', ".gridItem", function(){
 
     var $this = $(this);
+
+    if ($this.hasClass('big')) {
+      pulseGradientResize(this.__data__.bpm.averages,this.id.slice(6),widthCanvas,heightCanvas);
+    } else {
+      pulseGradientResize(this.__data__.bpm.averages,this.id.slice(6),316,316);
+    }
 
     $this.toggleClass('big');
 
@@ -365,15 +407,70 @@ function pulseGradientResize(data,index,width,height) {
 
 }
 
+function pulseGradient_text(bpm,index) {
+  // d3.select('#itemID'+index).selectAll('.avgText').remove();
+
+  d3.select('#itemID'+index).select('.avgText')
+    .text(Math.round(bpm));
+
+  var minText = d3.select('#itemID'+index).select('.minText').text();
+  var maxText = d3.select('#itemID'+index).select('.maxText').text();
+
+  // console.log(minText)
+
+  pulseGradient1Sek(minText,maxText,bpm,index)
+
+}
+
+function pulseGradient1Sek(min,max,avg,index) {
+
+  widthCanvas = document.getElementById('canvasID'+index).width;
+  heightCanvas = document.getElementById('canvasID'+index).height;
+
+  var c=document.getElementById("canvasID"+index);
+  var ctx=c.getContext("2d");
+
+  var grd=ctx.createLinearGradient(0,0,widthCanvas,0);
+
+  if (min < minBPM) {
+    grd.addColorStop(0,'rgb(0,0,0)');
+  } else if (min > maxBPM) {
+    grd.addColorStop(0,'rgb(255,255,255)');
+  } else {
+    grd.addColorStop(0,color(min));
+  }
+
+  if (avg < minBPM) {
+    grd.addColorStop(.2,'rgb(0,0,0)');
+    grd.addColorStop(.8,'rgb(0,0,0)');
+  } else if (avg > maxBPM) {
+    grd.addColorStop(.2,'rgb(255,255,255)');
+    grd.addColorStop(.8,'rgb(255,255,255)');
+  } else {
+    grd.addColorStop(.2,color(avg));
+    grd.addColorStop(.8,color(avg));
+  }
+
+  if (max < minBPM) {
+    grd.addColorStop(1,'rgb(0,0,0)');
+  } else if (max > maxBPM) {
+    grd.addColorStop(1,'rgb(255,255,255)');
+  } else {
+    grd.addColorStop(1,color(max));
+  }
+
+  ctx.fillStyle=grd;
+  ctx.fillRect(0,0,widthCanvas,heightCanvas);
+
+}
+
 function pulseGradient(data,index) {
 
-  d3.select('#itemID'+index).selectAll('.avgText').remove();
+  d3.select('#itemID'+index).select('.minText')
+    .text(Math.round(data.min));
 
-  d3.select('#itemID'+index)
-    .append('text')
-    .attr('class', 'avgText')
-    .text(Math.round(data.avg));
-
+  d3.select('#itemID'+index).select('.maxText')
+    .text(Math.round(data.max));
 
   var c=document.getElementById("canvasID"+index);
   var ctx=c.getContext("2d");
@@ -408,13 +505,13 @@ function pulseGradient(data,index) {
   }
 
   ctx.fillStyle=grd;
-  ctx.fillRect(0,gridSlice,widthCanvas,gridHeight);
+  ctx.fillRect(0,0,widthCanvas,heightCanvas);
 
 }
 
 function colorLegend() {
 
-  var width = 1000;
+  var width = 100;
 
   var c=document.getElementById("legend");
   var ctx=c.getContext("2d");
@@ -462,7 +559,7 @@ function colorLegend() {
 
 }
 
-colorLegend();
+colorLegend()
 
 
 </script>
