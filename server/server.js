@@ -82,7 +82,6 @@ setInterval(function(){
     at JSON.stringify (<anonymous>)
   */
   process.nextTick(function() {
-    console.log('tick')
     //var json = JSON.stringify(show,null,4);
     var json = JSON.stringify(show,null,4);
       fs.writeFile(show.name+'_autosave.json', json, 'utf8',
