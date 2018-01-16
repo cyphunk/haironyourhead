@@ -77,9 +77,17 @@ var debugb = require('debug')('averages')
 var show = new Group(showname)
 show.on_beat_cb = on_beat_cb
 setInterval(function(){
-  var json = JSON.stringify(show,null,4);
-    fs.writeFile(show.name+'_autosave.json', json, 'utf8',
-        function(){console.log('saved',show.name+'.json')});
+  /*       data = JSON.stringify(ev);
+    RangeError: Maximum call stack size exceeded
+    at JSON.stringify (<anonymous>)
+  */
+  process.nextTick(function() {
+    console.log('tick')
+    //var json = JSON.stringify(show,null,4);
+    var json = JSON.stringify(show,null,4);
+      fs.writeFile(show.name+'_autosave.json', json, 'utf8',
+          function(){console.log('saved',show.name+'.json')});
+  })
 },60000)
 
 var express  = require('express')
