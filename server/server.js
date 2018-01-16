@@ -45,14 +45,14 @@ program
   .option('-d, --debug <value>', 'default: false', false)
  .parse(process.argv);
 
-var showname      = program.showname;
-var oscport       = program.oscport;
-var wwwport       = program.wwwport;
-var host          = program.host;
-var ip_dev        = program.interface;
-var runtestserver = program.runtestserver;
-var DEBUG         = process.debug || process.env.hasOwnProperty('DEBUG');
-
+var showname           = program.showname;
+var oscport            = program.oscport;
+var wwwport            = program.wwwport;
+var host               = program.host;
+var ip_dev             = program.interface;
+var runtestserver      = program.runtestserver;
+var DEBUG              = process.debug || process.env.hasOwnProperty('DEBUG');
+var fs                 = require('fs')
 var send_info_every_ms = 2000;
 
 var ip_prefix = os.networkInterfaces()[ip_dev]
@@ -255,7 +255,7 @@ app.use('/vis', express.static('client/vis'), serveIndex('client/vis', {'icons':
 
 var oscserver = new OSCListener.Server(oscport);
 
-oscserver.on_message_cb = processOsc; 
+oscserver.on_message_cb = processOsc;
 oscserver.start();
 
 // call back on beat detection
