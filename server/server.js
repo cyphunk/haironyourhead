@@ -419,7 +419,6 @@ function packets_per_second(packets_total) {
  */
 
 if (process.stdin.isTTY) {
-    var fs   = require('fs');
     var util = require('util')
 
     var stdin = process.openStdin();
