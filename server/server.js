@@ -437,9 +437,11 @@ if (process.stdin.isTTY) {
         setTimeout(function(){process.exit()}, PROCESS_EXIT_WAIT);
       }
       else if ( key === '\u0013') { // ctrl+s aka save
+        process.nextTick(function() {
           var json = JSON.stringify(show,null,4);
             fs.writeFile(show.name+'.json', json, 'utf8',
                 function(){console.log('saved',show.name+'.json')});
+        })
       }
       else if ( key === '\u0014' || key === '\u001bt' ) { // ctrl+t or alt+t aka test
         console.log(util.inspect(show, {depth:null}))
