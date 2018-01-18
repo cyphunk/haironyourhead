@@ -353,6 +353,7 @@ function pulseGradient(data,index,id) {
 
   var avgPos = avgData.length - data.length;
 
+
   d3.select('#itemID'+id).selectAll('text').remove();
 
   var meanAvg = d3.mean(data, function(d) { return d[2]; }) - d3.mean(avgData, function(d) { return d[2]; });
@@ -377,12 +378,15 @@ function pulseGradient(data,index,id) {
   grd.addColorStop(timeScale(data[0][0]),'rgb(0,0,0)');
 
   data.forEach(function(d,i) {
-    if ((+d[2] - avgData[i+avgPos][2]) < minBPM) {
+    var offset = i+avgPos;
+    if (offset < 0 ) offset = 0;
+    if (offset > avgData.length-1) offset = avgData.length-1;
+    if ((+d[2] - avgData[offset][2]) < minBPM) {
       grd.addColorStop(timeScale(+d[0]),'rgb(0,0,0)');
-    } else if ((+d[2] - avgData[i+avgPos][2]) > maxBPM) {
+    } else if ((+d[2] - avgData[offset][2]) > maxBPM) {
       grd.addColorStop(timeScale(+d[0]),'rgb(255,255,255)');
     } else {
-      grd.addColorStop(timeScale(+d[0]),color((+d[2] - avgData[i+avgPos][2])));
+      grd.addColorStop(timeScale(+d[0]),color((+d[2] - avgData[offset][2])));
     }
   })
 
