@@ -36,7 +36,7 @@
     top: 10px;
     color: white;
     font-size: 10px;
-    background-color: black; 
+    background-color: black;
     border-left: 2px solid black;
     border-right: 2px solid black;
   }
@@ -69,7 +69,7 @@
     position: relative;
   }
   #legend{
-    
+
     width: 100%;
     height: 15px;
   }
@@ -179,7 +179,7 @@ socket.on('averages', function(data){
             pulseGradient(d,k);
         }
     });
-    
+
 });
 
 
@@ -187,6 +187,13 @@ initIsotope();
 
 
 var gridGroup = d3.select(".gridGroup");
+
+id_names = {
+  'device_0': 'AVERAGE',
+  'device_237': 'ANNA O',
+  'device_224': 'CHRISTIANE',
+  'device_225': 'CHRIS',
+}
 
 function boxVis_file(data) {
   var gridItem = gridGroup.selectAll(".gridItem")
@@ -205,7 +212,7 @@ function boxVis_file(data) {
     .attr('width', widthCanvas)
     .attr('height', heightCanvas)
     .attr('id', function(d,i) { return 'canvasID' + i })
-    
+
 
 }
 
@@ -389,7 +396,7 @@ function pulseGradient(data,index) {
     d3.select('#itemID'+index)
       .append('text')
       .attr('class', 'idText')
-      .text('ID '+ index.substr(7));
+      .text(id_names.hasOwnProperty(index) ? id_names[index] : 'ID '+ index.substr(7) );
   }
 
   d3.select('#itemID'+index)

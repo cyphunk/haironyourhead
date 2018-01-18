@@ -229,7 +229,10 @@ BPM.prototype = {
         this.debugc('bpm_systolic', 'valid')
         return ms;
     },
-    detect_: function(pulse_value) {
+    detect: function(pulse_value) {
+      this.detect_complex(pulse_value)
+    },
+    detect_simple_notworkinyet: function(pulse_value) {
       if (this._waitingforbeatpeak
           && pulse_value >= this.options.systolic_floor_value) {
           this.debug('beat')
@@ -237,7 +240,7 @@ BPM.prototype = {
           var now = new Date().getTime()
           this.bpm_window_add(now)
           this.bpm_avg = this.calc_bpm_avg()
-          if (this.samples_record_timer.is_it_time_yet())
+          // if (this.samples_record_timer.is_it_time_yet())
             this.samples.push([now,this.bpm_avg])
           if (typeof this.on_beat_cb === 'function')
               this.on_beat_cb({id: this.id, bpm: [now, this.bpm_avg]})
@@ -247,7 +250,7 @@ BPM.prototype = {
             this._waitingforbeatpeak = true;
           }
     },
-    detect: function(pulse_value) {
+    detect_complex: function(pulse_value) {
         this.debugb('detect begin', pulse_value)
         if (this._waitingforbeatpeak) {
             if (pulse_value >= this.options.systolic_floor_value) {
@@ -381,7 +384,7 @@ var default_options = {
         systolic_width:  0.3, // after bpm*this time is we will look for new beat
         bpm_min:         40,
         bpm_max:         220,
-        bpm_window_size: 15,
+        bpm_window_size: 10,
         null_on_fail:    false,
     },
     pulse: {

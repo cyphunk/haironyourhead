@@ -192,6 +192,13 @@ socket.on('averages', function(data){
 
 var gridGroup = d3.select(".gridGroup");
 
+id_names = {
+  'device_0': 'AVERAGE',
+  'device_237': 'ANNA O',
+  'device_224': 'CHRISTIANE',
+  'device_225': 'CHRIS',
+}
+
 function boxVis(data) {
 
   minTime = d3.min(data, function(d) { return d.bpm.averages[0][0]; });
@@ -293,7 +300,7 @@ function initIsotope_live() {
     $container.isotope({
       filter: function() {
         var number = $(this).find('.idText').text();
-        return number !== 'ID 0';
+        return number !== 'ID 0' && number !== id_names['device_0'];
       }
     });
   });
@@ -371,7 +378,7 @@ function pulseGradient(data,index,id) {
   d3.select('#itemID'+id)
     .append('text')
     .attr('class', 'idText')
-    .text('ID '+ id.substr(7));
+    .text(id_names.hasOwnProperty(id) ? id_names[id] : 'ID '+ id.substr(7) );
 
   var c = document.getElementById("canvasID"+id);
 
