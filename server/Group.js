@@ -105,6 +105,7 @@ Pulse.prototype = {
 
 function BPM(id, samples_per_second, options, on_beat_cb) {
     this.options    = options;
+    this.bpm_window_size = this.options.bpm_window_size
     this.id         = id;
     this.samples_ps = samples_per_second;
     this.on_beat_cb = on_beat_cb;
@@ -207,11 +208,11 @@ BPM.prototype = {
                                   / this.bpm_window.length
         var avg = (60*1000) / avg_beat_length_ms
         if (!this.bpm_valid(avg))
-            return 0; //this.options.default_bpm_avg;
+            return this.options.null_on_fail ? 0 : this.bpm_avg; //this.options.default_bpm_avg;
         return parseInt(avg);
     },
     bpm_window_add: function(timestamp) {
-        if (this.bpm_window.length >= this.options.bpm_window_size)
+        if (this.bpm_window.length >= this.bpm_window_size)
             this.bpm_window.shift()
         this.bpm_window.push(timestamp)
         this.debugc(this.bpm_window, '(bpm_window)')
@@ -231,19 +232,20 @@ BPM.prototype = {
     },
     detect: function(pulse_value) {
       this.detect_complex(pulse_value)
+      // this.detect_simple(pulse_value)
     },
-    detect_simple_notworkinyet: function(pulse_value) {
+    detect_simple: function(pulse_value) {
       if (this._waitingforbeatpeak
           && pulse_value >= this.options.systolic_floor_value) {
           this.debug('beat')
-          this._waitingforbeatpeak = false;
           var now = new Date().getTime()
           this.bpm_window_add(now)
           this.bpm_avg = this.calc_bpm_avg()
-          // if (this.samples_record_timer.is_it_time_yet())
+          if (this.samples_record_timer.is_it_time_yet())
             this.samples.push([now,this.bpm_avg])
           if (typeof this.on_beat_cb === 'function')
-              this.on_beat_cb({id: this.id, bpm: [now, this.bpm_avg]})
+            this.on_beat_cb({id: this.id, bpm: [now, this.bpm_avg]})
+          this._waitingforbeatpeak = false;
         }
         else if (!this._waitingforbeatpeak
           && pulse_value <= this.options.diastolic_roof_value) {
@@ -438,9 +440,11 @@ Group.prototype = {
         this.add_device('device_0')
     },
     add_device: function(device_id) {
-        this.debug('add_device', device_id)
+      this.debug('add_device', device_id)
         if (!this.devices.hasOwnProperty[device_id])
             this.devices[device_id] = new Device(device_id, this.options, this.on_beat_cb);
+
+
     },
     end: function() {
         this.timeend = new Date().getTime();

@@ -199,7 +199,6 @@ socket.on('samples', function(data){
           if (data[k].bpm.samples.length >= 1) {
               var entry = data[k].bpm.samples[0]
               var bpm = entry[1]
-              console.log('bpm',bpm)
               pulseGradient_text(bpm,k);
           }
       });
@@ -217,7 +216,7 @@ var gridGroup = d3.select(".gridGroup");
 
 id_names = {
   'device_0': 'AVERAGE',
-  'device_237': 'ANNA O',
+  'device_215': 'ANNA O',
   'device_224': 'CHRISTIANE',
   'device_225': 'CHRIS',
 }

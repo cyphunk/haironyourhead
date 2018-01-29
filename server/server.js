@@ -321,7 +321,14 @@ function processOsc(message) {
 
     if (!show.devices.hasOwnProperty(device_id)) {
         console.log('add_device', device_id)
-        show.add_device(device_id)
+        if (device_id == 'device_237'
+      /*ANNA O's should update more frequently*/) {
+          show.add_device(device_id)
+          show.devices[device_id].bpm.bpm_window_size = 5
+        }
+        else {
+          show.add_device(device_id)
+        }
     }
     show.devices[device_id].bpm.detect(pulse_value)
 

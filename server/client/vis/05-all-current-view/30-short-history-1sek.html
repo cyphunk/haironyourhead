@@ -201,7 +201,7 @@ var gridGroup = d3.select(".gridGroup");
 
 id_names = {
   'device_0': 'AVERAGE',
-  'device_237': 'ANNA O',
+  'device_215': 'ANNA O',
   'device_224': 'CHRISTIANE',
   'device_225': 'CHRIS',
 }
@@ -420,7 +420,17 @@ function pulseGradient1Sek(min,max,avg,index) {
   var c=document.getElementById("canvasID"+index);
   var ctx=c.getContext("2d");
 
-  var grd=ctx.createLinearGradient(0,0,widthCanvas,0);
+  if (d3.select('#itemID'+index).node().classList.contains('big')) {
+    var objWidthCanvas = 316
+    var objHeightCanvas = 316
+  }
+  else {
+    var objWidthCanvas = widthCanvas
+    var objHeightCanvas = gridHeight
+  }
+
+
+  var grd=ctx.createLinearGradient(0,0,objWidthCanvas,0);
 
   if (min < minBPM) {
     grd.addColorStop(0,'rgb(0,0,0)');
@@ -450,7 +460,7 @@ function pulseGradient1Sek(min,max,avg,index) {
   }
 
   ctx.fillStyle=grd;
-  ctx.fillRect(0,gridSlice,widthCanvas,gridHeight);
+  ctx.fillRect(0,gridSlice,objWidthCanvas,objHeightCanvas);
 
 }
 
