@@ -42,8 +42,8 @@ Server.prototype = {
         this.server.on("message", function (message, rinfo) {
             debug('message', message)
             _this.on_message_cb(message);
-            // console.log("Message:");
-            // console.log(message);
+            console.log("Message:");
+            console.log(message);
 
         });
 

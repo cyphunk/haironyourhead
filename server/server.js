@@ -85,7 +85,7 @@ setInterval(function(){
     //var json = JSON.stringify(show,null,4);
     var json = JSON.stringify(show,null,4);
       fs.writeFile(show.name+'_autosave.json', json, 'utf8',
-          function(){console.log('saved',show.name+'.json')});
+          function(){/*console.log('saved',show.name+'.json')*/});
   })
 },60000)
 
